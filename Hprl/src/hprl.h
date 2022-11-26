@@ -2,6 +2,8 @@
 #define _CRT_SECURE_NO_WARNINGS
 #define STB_TRUETYPE_IMPLEMENTATION 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#define  _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
+#define _SILENCE_CXX20_CODECVT_FACETS_DEPRECATION_WARNING
 #include "stb_truetype.h"
 #include "stb_image_write.h"
 #include <iostream>
@@ -10,6 +12,7 @@
 #include <string>
 #include<map>
 #include <unordered_map>
+#include "json.hpp"
 
 
 typedef std::u32string  hprl_string;
@@ -17,11 +20,41 @@ typedef char32_t        hprl_char;
 
 
 
+using json = nlohmann::json;
+
+
+inline unsigned int to_uint(char ch)
+{
+    
+    return static_cast<unsigned int>(static_cast<unsigned char>(ch));
+}
+
+
+//std::u32string to_utf32(const std::string& s)
+//{
+//    std::wstring_convert<std::codecvt<int32_t>, int32_t> convert;
+//    auto asInt = convert.from_bytes(s);
+//    return std::u32string(reinterpret_cast<char32_t const*>(asInt.data()), asInt.length());
+//
+//}
+
+
+
+std::u32string to_utf32(std::string const& s)
+{
+    std::wstring_convert<std::codecvt<char32_t, char, std::mbstate_t>, char32_t > convert;
+    auto asInt = convert.from_bytes(s);
+    return std::u32string(reinterpret_cast<char32_t const*>(asInt.data()), asInt.length());
+}
+
 
 
 namespace hprl {
 
     namespace FontManager {
+
+
+        
 
         struct RasterizedGlyph {
 
@@ -50,6 +83,24 @@ namespace hprl {
         struct FontColor {
 
             float r, g, b, alpha;
+
+
+            static struct FontColor colorConverter(std::string hexValue, float alpha)
+            {
+                if (hexValue.at(0) == '#') {
+                    hexValue.erase(0, 1);
+                }
+
+                int hex = stoul(hexValue, nullptr, 16);
+                struct FontColor rgbaColor;
+                rgbaColor.r = ((hex >> 16) & 0xFF) / 255.0;  
+                rgbaColor.g = ((hex >> 8) & 0xFF) / 255.0; 
+                rgbaColor.b = ((hex) & 0xFF) / 255.0;
+                rgbaColor.alpha = alpha;
+
+                return rgbaColor;
+            }
+
 
         };
 
@@ -186,6 +237,55 @@ namespace hprl {
 
         }
 
+        enum ATTRIBUTES{
+
+            BOLD,
+            ITALIC,
+            COLOR
+
+        };
+
+        enum LINE_ATTRIBUTES {
+
+            ORDERED_LIST,
+            UNORDERED_LIST,
+            ALIGN
+
+        };
+
+        class HprlMultiLineText {
+
+
+        public:
+            HprlMultiLineText(std::string raw_string) {
+
+                json j3 = json::parse(raw_string);
+
+
+            }
+
+
+        private:
+            struct HprlTextFragment {
+
+                hprl_string content;
+                std::map<ATTRIBUTES, std::string> attributes;
+
+            };
+
+            struct HprlLine {
+
+                std::vector<HprlTextFragment> text_fragments;
+                std::map<LINE_ATTRIBUTES, std::string> line_attributes;
+
+            };
+
+            std::vector<HprlLine> lines;
+
+
+
+
+        };
 
         //perchè height è in float?
         class FontFace {
@@ -244,33 +344,33 @@ namespace hprl {
                     float xpos = 0, ypos = 0; // leave a little padding in case the character extends left
 
 
-                    while (text[ch]) {
-
+                    while (to_uint(text[ch])) {
+                        unsigned int c = to_uint(text[ch]);
                         //è inefficiente controllare ogni volta però prende soltanto O(log n) essendo un albero rosso e nero
-                        if (glyphs.find(text[ch]) == glyphs.end()) {
+                        if (glyphs.find(c) == glyphs.end()) {
 
                             // not found
                             int x0, x1, y0, y1;
-                            stbtt_GetCodepointBitmapBox(&font_info, text[ch], scale_factor, scale_factor, &x0, &y0, &x1, &y1);
+                            stbtt_GetCodepointBitmapBox(&font_info, c, scale_factor, scale_factor, &x0, &y0, &x1, &y1);
 
                             int x_length = x1 - x0;
                             int y_length = y1 - y0;
                             int advance = 0, lsb = 0;
 
                             unsigned char* temp_bitmap = new unsigned char[x_length * y_length];
-                            stbtt_MakeCodepointBitmap(&font_info, temp_bitmap, x_length, y_length, x_length, scale_factor, scale_factor, text[ch]);
-                            stbtt_GetCodepointHMetrics(&font_info, text[ch], &advance, &lsb);
+                            stbtt_MakeCodepointBitmap(&font_info, temp_bitmap, x_length, y_length, x_length, scale_factor, scale_factor, c);
+                            stbtt_GetCodepointHMetrics(&font_info, c, &advance, &lsb);
                             RasterizedGlyph new_glyph = { temp_bitmap, x0, y0, x1, y1, advance, lsb };
 
-                            glyphs[text[ch]] = new_glyph;
+                            glyphs[c] = new_glyph;
 
                         }
 
 
-                        int advance = glyphs[text[ch]].advance;
-                        int lsb = glyphs[text[ch]].lsb;
-                        int x0 = glyphs[text[ch]].x0, y0 = font_instances_collection[height_char_pixel].glyphs[text[ch]].y0, x1 = glyphs[text[ch]].x1, y1 = glyphs[text[ch]].y1;
-                        unsigned char* temp_buffer = glyphs[text[ch]].bitmap;
+                        int advance = glyphs[c].advance;
+                        int lsb = glyphs[c].lsb;
+                        int x0 = glyphs[c].x0, y0 = font_instances_collection[height_char_pixel].glyphs[c].y0, x1 = glyphs[c].x1, y1 = glyphs[c].y1;
+                        unsigned char* temp_buffer = glyphs[c].bitmap;
 
 
 
@@ -287,7 +387,7 @@ namespace hprl {
 
                         xpos += (advance * scale_factor);
                         if (text[ch + 1])
-                            xpos += scale_factor * stbtt_GetCodepointKernAdvance(&font_info, text[ch], text[ch + 1]);
+                            xpos += scale_factor * stbtt_GetCodepointKernAdvance(&font_info, c, text[ch + 1]);
                         ++ch;
                     }
 

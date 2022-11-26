@@ -24,7 +24,7 @@
     <ClInclude Include="src\stb_image_write.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\peglib.h">
+    <ClInclude Include="src\json.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
