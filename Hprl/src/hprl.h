@@ -6,19 +6,19 @@
 #define _SILENCE_CXX20_CODECVT_FACETS_DEPRECATION_WARNING
 #include "stb_truetype.h"
 #include "stb_image_write.h"
+#include "json.hpp"
 #include <iostream>
 #include <stdio.h>
 #include<vector>
 #include <string>
 #include<map>
 #include <unordered_map>
-#include "json.hpp"
 
+
+#define DEFAULT_CHAR_HEIGHT_PX 18
 
 typedef std::u32string  hprl_string;
 typedef char32_t        hprl_char;
-
-
 
 using json = nlohmann::json;
 
@@ -30,21 +30,11 @@ inline unsigned int to_uint(char ch)
 }
 
 
-//std::u32string to_utf32(const std::string& s)
-//{
-//    std::wstring_convert<std::codecvt<int32_t>, int32_t> convert;
-//    auto asInt = convert.from_bytes(s);
-//    return std::u32string(reinterpret_cast<char32_t const*>(asInt.data()), asInt.length());
-//
-//}
-
-
-
-std::u32string to_utf32(std::string const& s)
+hprl_string to_utf32(std::string const& s)
 {
     std::wstring_convert<std::codecvt<char32_t, char, std::mbstate_t>, char32_t > convert;
     auto asInt = convert.from_bytes(s);
-    return std::u32string(reinterpret_cast<char32_t const*>(asInt.data()), asInt.length());
+    return hprl_string(reinterpret_cast<char32_t const*>(asInt.data()), asInt.length());
 }
 
 
@@ -53,8 +43,6 @@ namespace hprl {
 
     namespace FontManager {
 
-
-        
 
         struct RasterizedGlyph {
 
@@ -108,8 +96,7 @@ namespace hprl {
 
             const char* font_path;
             const int offset;
-            const char face_id;
-
+            const std::string font_face_prop;
 
         };
 
@@ -162,8 +149,7 @@ namespace hprl {
 
         };
 
-
-        unsigned char* convertSingle8_into_RGBA(unsigned char* single_ch_8bit_bitmap, int tex_w, int tex_h, FontColor color) {
+        unsigned char* convertSingle8_into_RGBA(unsigned char* single_ch_8bit_bitmap, int tex_w, int tex_h, FontColor& color) {
 
             unsigned char* new_buff = new unsigned char[tex_w * tex_h * 4];
 
@@ -238,11 +224,11 @@ namespace hprl {
         }
 
         enum ATTRIBUTES{
-
             BOLD,
             ITALIC,
+            STRIKE,
+            UNDERLINE,
             COLOR
-
         };
 
         enum LINE_ATTRIBUTES {
@@ -250,40 +236,130 @@ namespace hprl {
             ORDERED_LIST,
             UNORDERED_LIST,
             ALIGN
+        };
+
+
+     
+
+        struct HprlTextFragment {
+
+
+            HprlTextFragment(json& text_frag) {
+
+                content = to_utf32(text_frag["insert"]);
+                content_utf8 = text_frag["insert"];
+                text_attributes = text_frag["attributes"];
+
+                if (text_attributes.contains("size")) {
+                    
+                    std::string size_s = text_attributes["size"];
+                    fragment_height_px = std::stoul(size_s.substr(0, size_s.size() - 2).c_str());
+                }
+                else {
+
+                    fragment_height_px = DEFAULT_CHAR_HEIGHT_PX;
+
+                }
+
+            }
+
+            hprl_string content;
+            json text_attributes;
+            std::string content_utf8;
+            unsigned int fragment_height_px;
+
+
+            void printToConsoleFragment() {
+
+                std::cout << "Fragment content: " << content_utf8 << std::endl;
+                std::cout <<"Attributes: " << text_attributes.dump() << std::endl;
+            }
+
+        };
+
+        struct HprlLine {
+
+
+
+            HprlLine(json& line_ini) {
+
+                max_char_height_line_px = 0;
+                line_attributes = line_ini["line_attributes"];
+
+                for (json& x : line_ini["content"]["ops"]) {
+
+                    text_fragments.push_back(HprlTextFragment(x));
+
+                }
+
+                for (auto& x : text_fragments) {
+
+                    if (x.fragment_height_px > max_char_height_line_px) {
+                        
+                        max_char_height_line_px = x.fragment_height_px;
+
+                    }
+                 
+                }
+
+
+                
+
+            }
+
+  
+            std::vector<HprlTextFragment> text_fragments;
+            json line_attributes;
+            unsigned int max_char_height_line_px;
+
+            void printToConsoleLine() {
+
+                std::cout << "\n******************" << std::endl;
+                for (auto x : text_fragments) {
+                    x.printToConsoleFragment();
+                }
+
+                std::cout << "Line attributes: " << line_attributes.dump() << std::endl;
+                std::cout << "Max height line: " << max_char_height_line_px << std::endl;
+                std::cout << "\n******************" << std::endl;
+
+            }
+
 
         };
 
         class HprlMultiLineText {
 
+            public:
+            
+                HprlMultiLineText(unsigned int ini_width_px, unsigned int ini_height_px, json& lines) {
 
-        public:
-            HprlMultiLineText(std::string raw_string) {
+                    width_px = ini_width_px;
+                    height_px = ini_height_px;
 
-                json j3 = json::parse(raw_string);
+                    for (json& x : lines) {
+
+                        lines_vec.push_back(HprlLine(x));
+
+                    }
 
 
+                }
+
+
+                void printToConsoleText() {
+                    for (auto x : lines_vec) {
+                        x.printToConsoleLine();
+                    }
             }
 
+            private:
 
-        private:
-            struct HprlTextFragment {
+                unsigned int width_px;
+                unsigned int height_px;
+                std::vector<HprlLine> lines_vec;
 
-                hprl_string content;
-                std::map<ATTRIBUTES, std::string> attributes;
-
-            };
-
-            struct HprlLine {
-
-                std::vector<HprlTextFragment> text_fragments;
-                std::map<LINE_ATTRIBUTES, std::string> line_attributes;
-
-            };
-
-            std::vector<HprlLine> lines;
-
-
-
+               
 
         };
 
@@ -308,7 +384,7 @@ namespace hprl {
             
             FontFace() = delete;
 
-            unsigned char* createTextTextureSingleFontFace(std::vector<std::u32string> lines, float height_char_pixel, FontColor color) {
+            unsigned char* createTextTextureSingleFontFace(std::vector<hprl_string>& lines, float height_char_pixel, FontColor& color) {
                 
                 if (font_instances_collection.find(height_char_pixel) == font_instances_collection.end()) {
                 
@@ -337,7 +413,7 @@ namespace hprl {
 
 
 
-                for (std::u32string text : lines) {
+                for (hprl_string text : lines) {
 
                     int ch = 0;
                     //int xoff, yoff = 0;
@@ -497,7 +573,7 @@ namespace hprl {
             
 
 
-            void initializeFontFace(char32_t first_char, char32_t char_count, std::vector<float> heights_char_pixel) {
+            void initializeFontFace(char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel) {
 
 
                 for (float h : heights_char_pixel) {
@@ -538,7 +614,7 @@ namespace hprl {
             }
 
             //da rivedere l'aggiunta di un padding proporzionale
-            void getTextureDimensions(std::vector<std::u32string> lines, int& tex_w, int& tex_h, float height_char_pixel) {
+            void getTextureDimensions(std::vector<hprl_string>& lines, int& tex_w, int& tex_h, float height_char_pixel) {
 
                 
                 tex_h = font_instances_collection[height_char_pixel].max_h_bbox_font * lines.size();
@@ -547,7 +623,7 @@ namespace hprl {
 
                 float scale_factor = font_instances_collection[height_char_pixel].scale_factor;
 
-                for (std::u32string line : lines) {
+                for (hprl_string line : lines) {
 
                     int ch = 0;
                     float xpos = 0, ypos = 0;
@@ -606,24 +682,24 @@ namespace hprl {
 
         };
 
-        class FontFamily {
+        class TextManager {
 
             public:
 
-                FontFamily(std::vector<FontFaceDescription> ff_descr, char32_t first_char, char32_t char_count, std::vector<float> heights_char_pixel) {
+                TextManager(std::vector<FontFaceDescription>& ff_descr, char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel) {
 
                     for (FontFaceDescription& f : ff_descr) {
 
-                        font_faces_map.emplace(f.face_id, FontFace(f.font_path, first_char, char_count, heights_char_pixel, f.offset));
+                        font_faces_map.emplace(f.font_face_prop, FontFace(f.font_path, first_char, char_count, heights_char_pixel, f.offset));
 
                     }
 
 
                 }
 
-                FontFamily() = delete;
+                TextManager() = delete;
 
-                void printFaceInformation(short face_id) {
+                void printFaceInformation(std::string face_id) {
 
                     if (font_faces_map.contains(face_id)) {
                         font_faces_map.at(face_id).giveFaceInformation();
@@ -631,9 +707,7 @@ namespace hprl {
 
                 }
 
-
-
-                unsigned char* createTextTextureSingleFontFace(char face_id, std::vector<std::u32string> lines, float height_char_pixel, FontColor color) {
+                unsigned char* createTextTextureSingleFontFace(std::string face_id, std::vector<hprl_string>& lines, float height_char_pixel, FontColor& color) {
 
                     if (font_faces_map.contains(face_id)) {
 
@@ -646,11 +720,56 @@ namespace hprl {
                 
 
 
+                void parse(std::u8string input) {
+
+
+                    json text_descr = json::parse(input);
+
+                    json lines = text_descr["lines"];
+                    json dimensions = text_descr["dimensions"];
+
+                    std::string width_s = dimensions["width"];
+                    std::string height_s = dimensions["height"];
+                    
+                    if (width_s.size() <= 2 || height_s.size() <= 2) {
+
+                        throw std::runtime_error("BAD DIMENSIONS IN PARSED STRING");
+
+                    }
+
+
+                    //strip px
+                    unsigned int width = std::stoul(width_s.substr(0, width_s.size() - 2).c_str());
+                    unsigned int height = std::stoul(height_s.substr(0, height_s.size() - 2).c_str());
+
+                    std::size_t h1 = std::hash<std::u8string>{}(input);
+
+                    cache_multi_line.emplace(h1, HprlMultiLineText(width, height, lines));
+                   
+
+                }
+
+                void printToConsole(std::u8string in) {
+
+                    std::size_t h1 = std::hash<std::u8string>{}(in);
+
+                    if (cache_multi_line.contains(h1)) {
+                        cache_multi_line.at(h1).printToConsoleText();
+                    }
+                    else {
+
+                        std::cout << "No such string in map" << std::endl;
+                    }
+
+                }
+
+
+
             private:
 
-                std::map<char, FontFace> font_faces_map;
 
-
+                std::unordered_map<std::string, FontFace> font_faces_map;
+                std::unordered_map<std::size_t, HprlMultiLineText> cache_multi_line;
 
         };
 
