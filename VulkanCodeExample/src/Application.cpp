@@ -30,7 +30,7 @@ int main() {
 
     SetConsoleOutputCP(65001);
 
-    u8string in = u8R"({"lines":[{"content":{"ops":[{"insert":"La riga a "},{"attributes":{"bold":true},"insert":"si"},{"attributes":{"size":"25px","bold":true},"insert":"nistra"}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"size":"28px"},"insert":"Ri"},{"attributes":{"size":"10px"},"insert":"ga"},{"attributes":{"size":"28px"},"insert":" al "},{"attributes":{"color":"#e60000","size":"31px"},"insert":"cen"},{"attributes":{"color":"#e60000","size":"28px"},"insert":"tro"}]},"line_attributes":{"align":"center"}},{"content":{"ops":[{"insert":"Riga a "},{"attributes":{"underline":true},"insert":"destra"}]},"line_attributes":{"align":"right"}},{"content":{"ops":[{"insert":"Lista "},{"attributes":{"strike":true},"insert":"puntata"}]},"line_attributes":{"list":"ordered"}},{"content":{"ops":[{"insert":"Lista "},{"attributes":{"italic":true},"insert":"bullet"}]},"line_attributes":{"align":"center","list":"bullet"}}],"dimensions":{"width":"1728px","height":"750px"}})";
+    u8string in = u8R"({"lines":[{"content":{"ops":[{"attributes":{"size":"100px"},"insert":"Saponazzo"}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"color":"#e60000","size":"100px"},"insert":"Saponazzo"}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"color":"#008a00","size":"35px"},"insert":"Sapo"},{"attributes":{"size":"35px"},"insert":"ne"},{"attributes":{"color":"#008a00","size":"35px"},"insert":"tta"}]},"line_attributes":{"align":"right"}}],"dimensions":{"width":"1728px","height":"750px"}})";
     json j3 = json::parse(in);
 
     string stringhetta = j3["lines"][0]["content"]["ops"][0]["insert"];
@@ -48,7 +48,10 @@ int main() {
     vector<FontFaceDescription> descr;
     descr.push_back(f_descr1);
     descr.push_back(f_descr2);
-    TextManager font_fam = TextManager(descr, 32, 95, myHeights);
+
+   
+    BasicFontDescription bas_descr{ f_descr1, f_descr2, f_descr1, f_descr2, descr };
+    TextManager font_fam = TextManager(bas_descr, 32, 95, myHeights);
 
 
     font_fam.parse(in);
@@ -60,7 +63,7 @@ int main() {
     ///*font_fam.createTextTextureSingleFontFace('a', text, 50, myColor1);
     //font_fam.createTextTextureSingleFontFace('b', text, 60, myColor1);
     //font_fam.createTextTextureSingleFontFace('b', text, 70, myColor1);*/
-    //font_fam.createTextTextureSingleFontFace("BOLD", text, 100, myColor1);
+    //font_fam.createTextTextureSingleFontFace("bold", text, 100, myColor1);
     //auto t2 = Clock::now();
    
     //std::cout << "\n\nDelta time t2-t1: "

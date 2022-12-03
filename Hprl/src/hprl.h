@@ -100,6 +100,16 @@ namespace hprl {
 
         };
 
+        struct BasicFontDescription {
+
+            FontFaceDescription normal;
+            FontFaceDescription bold;
+            FontFaceDescription italic;
+            FontFaceDescription bolditalic;
+            std::vector<FontFaceDescription>& other_ff_descr;
+
+        };
+
         struct HprlPackedchar {
 
             unsigned short x0, y0, x1, y1; // coordinates of bbox in bitmap
@@ -223,24 +233,7 @@ namespace hprl {
 
         }
 
-        enum ATTRIBUTES{
-            BOLD,
-            ITALIC,
-            STRIKE,
-            UNDERLINE,
-            COLOR
-        };
-
-        enum LINE_ATTRIBUTES {
-
-            ORDERED_LIST,
-            UNORDERED_LIST,
-            ALIGN
-        };
-
-
-     
-
+        
         struct HprlTextFragment {
 
 
@@ -353,13 +346,10 @@ namespace hprl {
                     }
             }
 
-            private:
 
                 unsigned int width_px;
                 unsigned int height_px;
                 std::vector<HprlLine> lines_vec;
-
-               
 
         };
 
@@ -563,10 +553,10 @@ namespace hprl {
             stbtt_fontinfo font_info;
             char32_t first_char_ini;
             char32_t char_count_ini;
-
             int ascent;
             int descent;
             int line_gap;
+
             FontBoundingBox font_bbox;
 
             std::map<float, FontInstance> font_instances_collection;
@@ -682,15 +672,160 @@ namespace hprl {
 
         };
 
+
+        class FontFaceNew {
+
+
+        public:
+
+            int ascent;
+            int descent;
+            int line_gap;
+            FontBoundingBox font_bbox;
+
+            FontFaceNew(const char* font_path, char32_t first_char, char32_t char_count, std::vector<float> heights_char_pixel, int offset) {
+
+                this->font_path = font_path;
+                this->font_data = readFontData(font_path);
+                this->first_char_ini = first_char;
+                this->char_count_ini = char_count;
+                stbtt_InitFont(&font_info, font_data, offset);
+                stbtt_GetFontVMetrics(&font_info, &ascent, &descent, &line_gap);
+                initializeFontFace(first_char, char_count, heights_char_pixel);
+
+            }
+
+            FontFaceNew() = delete;
+
+
+
+            RasterizedGlyph& getGlyph(char32_t requested_char, float height_char_pixel) {
+
+                if (!font_instances_collection.contains(height_char_pixel)) {
+
+                    std::vector h{ height_char_pixel };
+                    initializeFontFace(requested_char, 1, h);
+
+                }
+                else {
+
+                    float scale_factor = font_instances_collection[height_char_pixel].scale_factor;
+
+                    if (!font_instances_collection.at(height_char_pixel).glyphs.contains(requested_char)) {
+
+                        // not found
+                        int x0, x1, y0, y1;
+                        stbtt_GetCodepointBitmapBox(&font_info, requested_char, scale_factor, scale_factor, &x0, &y0, &x1, &y1);
+
+                        int x_length = x1 - x0;
+                        int y_length = y1 - y0;
+                        int advance = 0, lsb = 0;
+
+                        unsigned char* temp_bitmap = new unsigned char[x_length * y_length];
+                        stbtt_MakeCodepointBitmap(&font_info, temp_bitmap, x_length, y_length, x_length, scale_factor, scale_factor, requested_char);
+                        stbtt_GetCodepointHMetrics(&font_info, requested_char, &advance, &lsb);
+                        RasterizedGlyph new_glyph = { temp_bitmap, x0, y0, x1, y1, advance, lsb };
+
+                        font_instances_collection.at(height_char_pixel).glyphs[requested_char] = new_glyph;
+
+                    }
+                }
+
+
+                return font_instances_collection.at(height_char_pixel).glyphs[requested_char];
+
+            }
+            
+            float getScaleFactor(float height_char_pixel) {
+
+                if (font_instances_collection.contains(height_char_pixel)) {
+                
+                    return font_instances_collection[height_char_pixel].scale_factor;
+                }
+                else {
+
+                    std::vector h{ height_char_pixel };
+                    initializeFontFace(32, 1, h);
+
+      
+                    return font_instances_collection[height_char_pixel].scale_factor;
+
+                }
+            }
+
+
+
+        private:
+
+            const char* font_path;
+            unsigned char* font_data;
+            stbtt_fontinfo font_info;
+            char32_t first_char_ini;
+            char32_t char_count_ini;
+
+
+            std::map<float, FontInstance> font_instances_collection;
+
+
+            void initializeFontFace(char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel) {
+
+
+                for (float h : heights_char_pixel) {
+
+
+                    FontInstance font_instance;
+
+                    float scale_factor = stbtt_ScaleForPixelHeight(&font_info, h);
+                    int max_h_bbox_font = int((font_bbox.y1 - font_bbox.y0) * scale_factor);
+                    int max_w_bbox_font = int((font_bbox.x1 - font_bbox.x0) * scale_factor);
+
+
+                    for (int i = first_char; i < first_char + char_count; i++) {
+
+                        int x0, x1, y0, y1;
+                        stbtt_GetCodepointBitmapBox(&font_info, i, scale_factor, scale_factor, &x0, &y0, &x1, &y1);
+
+                        int x_length = x1 - x0;
+                        int y_length = y1 - y0;
+                        int advance = 0, lsb = 0;
+
+                        unsigned char* temp_bitmap = new unsigned char[x_length * y_length];
+                        stbtt_MakeCodepointBitmap(&font_info, temp_bitmap, x_length, y_length, x_length, scale_factor, scale_factor, i);
+                        stbtt_GetCodepointHMetrics(&font_info, i, &advance, &lsb);
+
+                        font_instance.glyphs[i] = { temp_bitmap, x0, y0, x1, y1, advance, lsb };
+
+
+                    }
+
+                    font_instance.scale_factor = scale_factor;
+                    font_instance.max_h_bbox_font = max_h_bbox_font;
+                    font_instance.max_w_bbox_font = max_w_bbox_font;
+                    font_instances_collection[h] = font_instance;
+
+
+                }
+            }
+
+
+        };
+
+
+
         class TextManager {
 
             public:
+                TextManager(BasicFontDescription& basic_ff_descr, char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel){
 
-                TextManager(std::vector<FontFaceDescription>& ff_descr, char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel) {
+                  
+                    basic_font_faces_map.emplace("normal", FontFaceNew(basic_ff_descr.normal.font_path, first_char, char_count, heights_char_pixel, basic_ff_descr.normal.offset));
+                    basic_font_faces_map.emplace("bold", FontFaceNew(basic_ff_descr.bold.font_path, first_char, char_count, heights_char_pixel, basic_ff_descr.bold.offset));
+                    basic_font_faces_map.emplace("italic", FontFaceNew(basic_ff_descr.italic.font_path, first_char, char_count, heights_char_pixel, basic_ff_descr.italic.offset));
+                    basic_font_faces_map.emplace("bolditalic", FontFaceNew(basic_ff_descr.bolditalic.font_path, first_char, char_count, heights_char_pixel, basic_ff_descr.bolditalic.offset));
 
-                    for (FontFaceDescription& f : ff_descr) {
+                    for (FontFaceDescription& f : basic_ff_descr.other_ff_descr) {
 
-                        font_faces_map.emplace(f.font_face_prop, FontFace(f.font_path, first_char, char_count, heights_char_pixel, f.offset));
+                        other_font_faces_map.emplace(f.font_face_prop, FontFaceNew(f.font_path, first_char, char_count, heights_char_pixel, f.offset));
 
                     }
 
@@ -699,55 +834,49 @@ namespace hprl {
 
                 TextManager() = delete;
 
-                void printFaceInformation(std::string face_id) {
-
-                    if (font_faces_map.contains(face_id)) {
-                        font_faces_map.at(face_id).giveFaceInformation();
-                    }
-
-                }
-
-                unsigned char* createTextTextureSingleFontFace(std::string face_id, std::vector<hprl_string>& lines, float height_char_pixel, FontColor& color) {
-
-                    if (font_faces_map.contains(face_id)) {
-
-                        return font_faces_map.at(face_id).createTextTextureSingleFontFace(lines, height_char_pixel, color);
-                    }
-
-                    else return nullptr;
-
-                }
-                
-
-
+          
                 void parse(std::u8string input) {
-
-
-                    json text_descr = json::parse(input);
-
-                    json lines = text_descr["lines"];
-                    json dimensions = text_descr["dimensions"];
-
-                    std::string width_s = dimensions["width"];
-                    std::string height_s = dimensions["height"];
-                    
-                    if (width_s.size() <= 2 || height_s.size() <= 2) {
-
-                        throw std::runtime_error("BAD DIMENSIONS IN PARSED STRING");
-
-                    }
-
-
-                    //strip px
-                    unsigned int width = std::stoul(width_s.substr(0, width_s.size() - 2).c_str());
-                    unsigned int height = std::stoul(height_s.substr(0, height_s.size() - 2).c_str());
 
                     std::size_t h1 = std::hash<std::u8string>{}(input);
 
-                    cache_multi_line.emplace(h1, HprlMultiLineText(width, height, lines));
-                   
+                    if (!cache_multi_line.contains(h1)) {
+
+                        json text_descr = json::parse(input);
+
+                        json lines = text_descr["lines"];
+                        json dimensions = text_descr["dimensions"];
+
+                        std::string width_s = dimensions["width"];
+                        std::string height_s = dimensions["height"];
+
+                        if (width_s.size() <= 2 || height_s.size() <= 2) {
+
+                            throw std::runtime_error("BAD DIMENSIONS IN PARSED STRING");
+
+                        }
+
+
+                        //strip px
+                        unsigned int width = std::stoul(width_s.substr(0, width_s.size() - 2).c_str());
+                        unsigned int height = std::stoul(height_s.substr(0, height_s.size() - 2).c_str());
+
+
+
+                        cache_multi_line.emplace(h1, HprlMultiLineText(width, height, lines));
+
+
+                        for (HprlLine x : cache_multi_line.at(h1).lines_vec) {
+
+                            std::cout << "Lunghezza linea: " << getLineLength(x) << std::endl;
+                        }
+
+                    }
+
+
+                    createTexture(cache_multi_line.at(h1));
 
                 }
+
 
                 void printToConsole(std::u8string in) {
 
@@ -767,9 +896,283 @@ namespace hprl {
 
             private:
 
+                
 
-                std::unordered_map<std::string, FontFace> font_faces_map;
+                std::unordered_map<std::string, FontFaceNew> basic_font_faces_map;
+
+                std::unordered_map<std::string, FontFaceNew> other_font_faces_map;
+
                 std::unordered_map<std::size_t, HprlMultiLineText> cache_multi_line;
+
+
+
+
+                void createTexture(HprlMultiLineText& text) {
+
+
+                    int tex_w = text.width_px, tex_h = text.height_px;
+                    unsigned char* work_buffer = new unsigned char[tex_h * tex_w * 4];
+                    unsigned char* single_channel_buff = new unsigned char[tex_h * tex_w];
+                    int center_x_texture = ceil(tex_w / 2);
+
+                    for (int i = 0; i < tex_w * tex_h * 4; i++) {
+
+                        work_buffer[i] = 0;
+
+                    }
+
+                    for (int i = 0; i < tex_w * tex_h; i++) {
+
+                        single_channel_buff[i] = 0;
+
+                    }
+
+                    
+                    int ascent = basic_font_faces_map.at("normal").ascent;
+                    int descent = basic_font_faces_map.at("normal").descent;
+                    int line_gap = basic_font_faces_map.at("normal").line_gap;
+                    
+                    float max_height_ini = text.lines_vec[0].max_char_height_line_px;
+                    int baseline = (int)(basic_font_faces_map.at("normal").ascent * basic_font_faces_map.at("normal").getScaleFactor(max_height_ini));
+                    
+                   
+
+                    for (int i = 0; i < text.lines_vec.size(); i++) {
+                        
+
+                        json line_attributes = text.lines_vec[i].line_attributes;
+                        int xpos = 0;
+
+                        
+
+                        if (line_attributes.contains("align")) {
+
+                            std::string alignment = line_attributes["align"];
+
+                            
+
+                            if (alignment.compare(std::string("center")) == 0) {
+
+                                xpos = center_x_texture - ceil(getLineLength(text.lines_vec[i]) / 2);
+                            }
+
+                            if (alignment.compare(std::string("right")) == 0) {
+
+                                xpos = tex_w - getLineLength(text.lines_vec[i]);
+                            }
+
+
+                        }
+
+
+
+                        for (HprlTextFragment frag : text.lines_vec[i].text_fragments) {
+                            printTextFragment(frag, work_buffer, single_channel_buff, tex_w, tex_h, xpos, baseline);
+                        }
+
+                        if (i < text.lines_vec.size() - 1) {
+                            int max_height = text.lines_vec[i + 1].max_char_height_line_px;
+                            baseline += (ascent - descent + line_gap) * basic_font_faces_map.at("normal").getScaleFactor(max_height);
+                        }
+                    }
+
+
+                    stbi_write_png("test.png", tex_w, tex_h, 4, work_buffer, tex_w * 4);
+
+                }
+
+
+                void printTextFragment(HprlTextFragment& frag, unsigned char* work_buffer, unsigned char* single_chan_buf, int tex_w, int tex_h, int &xpos, int &baseline) {
+
+                    bool isStriked = false;
+                    bool isUnderlined = false;
+                    json attributes = frag.text_attributes;
+                    unsigned int height = frag.fragment_height_px;
+                    FontColor color;
+
+                    
+
+
+                    if (attributes.contains("color")) {
+
+                        color = FontColor::colorConverter(attributes["color"], 1.0f);
+
+                    }
+                    else {
+                          
+                        color = FontColor{ 0.0f, 0.0f, 0.0f, 1.0f };
+                    }
+
+                    
+                    FontFaceNew& work_font_face = basic_font_faces_map.at("normal");
+
+                    if (!attributes.contains("bold") && !attributes.contains("italic")) {
+
+                        work_font_face = basic_font_faces_map.at("normal");
+
+                    }
+
+
+                    if (attributes.contains("bold") && attributes.contains("italic")) {
+
+                        work_font_face = basic_font_faces_map.at("bolditalic");
+
+                    }
+
+                    if (attributes.contains("bold") && !attributes.contains("italic")) {
+
+
+                        work_font_face = basic_font_faces_map.at("bold");
+
+
+                    }
+
+                    else {
+
+                        work_font_face = basic_font_faces_map.at("italic");
+
+                    }
+
+
+
+                    int ch = 0;
+                    hprl_string text = frag.content;
+                    
+                    float scale_factor = work_font_face.getScaleFactor(height);
+
+
+                    while (to_uint(text[ch])) {
+                        unsigned int c = to_uint(text[ch]);
+                        
+                        RasterizedGlyph& glyph = work_font_face.getGlyph(c, height);
+
+                        int advance = glyph.advance;
+                        int lsb = glyph.lsb;
+                        int x0 = glyph.x0, y0 = glyph.y0, x1 = glyph.x1, y1 = glyph.y1;
+
+                        unsigned char* temp_buffer = glyph.bitmap;
+
+
+                        for (int j = y0; j < y1; j++) {
+                            for (int i = x0; i < x1; i++) {
+                                if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] != 0 && temp_buffer[(j - y0) * (x1 - x0) + (i - x0)] == 0) {
+
+                                }
+                                else {
+
+                                    single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] = temp_buffer[(j - y0) * (x1 - x0) + (i - x0)];
+                                }
+                            }
+                        }
+
+                        for (int j = y0; j < y1; j++) {
+                            for (int i = x0; i < x1; i++) {
+
+                                if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] == 0) {
+
+                                    //red
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = 0;
+                                    //green
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = 0;
+                                    //blue
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = 0;
+                                    //alpha
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = 0;
+
+
+                                }
+
+                                else {
+
+                                    //red
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = unsigned char(color.r * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                                    //green
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = unsigned char(color.g * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                                    //blue
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = unsigned char(color.b * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                                    //alpha
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = unsigned char(color.alpha * 255);
+
+                                }
+
+
+                        }
+
+                    }
+
+                        xpos += (advance * scale_factor);
+
+                        ++ch;
+                    }
+                    
+
+                }
+
+
+                int getLineLength(HprlLine& line) {
+
+                    int total_length = 0;
+
+                    for (HprlTextFragment frag : line.text_fragments) {
+
+                        total_length += getFragmentLength(frag);
+
+                    }
+
+                    return total_length;
+
+
+
+                }
+
+
+                int getFragmentLength(HprlTextFragment& frag) {
+
+                    json attributes = frag.text_attributes;
+                    hprl_string content = frag.content;
+                    unsigned int height_px = frag.fragment_height_px;
+
+                    FontFaceNew& work_font_face = basic_font_faces_map.at("normal");
+
+                    if (!attributes.contains("bold") && attributes.contains("italic")) {
+
+                        work_font_face = basic_font_faces_map.at("italic");
+
+                    }
+
+
+                    if (attributes.contains("bold") && attributes.contains("italic")) {
+
+                        work_font_face = basic_font_faces_map.at("bolditalic");
+
+                    }
+
+                    if (attributes.contains("bold") && !attributes.contains("italic")) {
+
+
+                        work_font_face = basic_font_faces_map.at("bold");
+
+
+                    }
+
+                    int ch = 0;
+                    float xpos = 0;
+
+
+                    while (content[ch]) {
+
+                        RasterizedGlyph& glyph = work_font_face.getGlyph(content[ch], height_px);
+                        int advance = glyph.advance;
+                        xpos += (advance * work_font_face.getScaleFactor(height_px));
+                        ++ch;
+                    }
+
+                    return ceil(xpos);
+
+                }
+
+                
+
 
         };
 
