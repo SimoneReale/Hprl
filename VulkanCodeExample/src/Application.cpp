@@ -30,54 +30,37 @@ int main() {
 
     SetConsoleOutputCP(65001);
 
-    u8string in = u8R"({"lines":[{"content":{"ops":[{"attributes":{"size":"100px"},"insert":"Saponazzo"}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"color":"#e60000","size":"100px"},"insert":"Saponazzo"}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"color":"#008a00","size":"35px"},"insert":"Sapo"},{"attributes":{"size":"35px"},"insert":"ne"},{"attributes":{"color":"#008a00","size":"35px"},"insert":"tta"}]},"line_attributes":{"align":"right"}}],"dimensions":{"width":"1728px","height":"750px"}})";
-    json j3 = json::parse(in);
-
-    string stringhetta = j3["lines"][0]["content"]["ops"][0]["insert"];
-
-    vector<hprl_string> text{to_utf32(stringhetta), U"ti voglio male:", U"Non è domenica", U"èùòà£", U"LYVWvwy"};
-
+    u8string in = u8R"({"lines":[{"content":{"ops":[{"attributes":{"underline":true,"strike":true,"italic":true,"size":"92px","color":"#e60000","bold":true},"insert":"Str"},{"attributes":{"underline":true,"strike":true,"italic":true,"size":"92px","color":"#9933ff","bold":true},"insert":"ike    "}]},"line_attributes":{}}],"dimensions":{"width":"1728px","height":"750px"}})";
+    
     vector<float> myHeights{50, 60, 70, 100};
 
-    FontColor myColor1 = FontColor::colorConverter("#9933ff", 1);
-    FontColor myColor2{ 1.0f, 1.0f, 1.0f, 1.0f };
-
-    FontFaceDescription f_descr1{"c:/windows/fonts/arial.ttf", 0, "NORMAL"};
-    FontFaceDescription f_descr2{ "c:/windows/fonts/arialbd.ttf", 0, "BOLD"};
-    
-    vector<FontFaceDescription> descr;
-    descr.push_back(f_descr1);
-    descr.push_back(f_descr2);
-
    
-    BasicFontDescription bas_descr{ f_descr1, f_descr2, f_descr1, f_descr2, descr };
+    FontFaceDescription f_normal{"c:/windows/fonts/arial.ttf", 0, "NORMAL"};
+    FontFaceDescription f_bold{ "c:/windows/fonts/arialbd.ttf", 0, "BOLD"};
+    FontFaceDescription f_italic{ "c:/windows/fonts/ariali.ttf", 0, "ITALIC" };
+    FontFaceDescription f_bolditalic{ "c:/windows/fonts/arialbi.ttf", 0, "BOLDITALIC" };
+    
+    vector<FontFaceDescription> descr{};
+ 
+    BasicFontDescription bas_descr{ f_normal, f_bold, f_italic, f_bolditalic, descr };
     TextManager font_fam = TextManager(bas_descr, 32, 95, myHeights);
 
-
-    font_fam.parse(in);
-
-    font_fam.printToConsole(in);
+    
 
 
-    //auto t1 = Clock::now();
+    auto t1 = Clock::now();
     ///*font_fam.createTextTextureSingleFontFace('a', text, 50, myColor1);
     //font_fam.createTextTextureSingleFontFace('b', text, 60, myColor1);
     //font_fam.createTextTextureSingleFontFace('b', text, 70, myColor1);*/
     //font_fam.createTextTextureSingleFontFace("bold", text, 100, myColor1);
-    //auto t2 = Clock::now();
+    font_fam.parse(in);
+    font_fam.printToConsole(in);
+    
+    auto t2 = Clock::now();
    
-    //std::cout << "\n\nDelta time t2-t1: "
-    //    << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()
-    //    << " microseconds" << std::endl;
-
-
-
-   /* std::size_t h1 = std::hash<std::string>{}(R"({"lines": [{"content":{"ops": [{"insert":"NONNa è Pnuozzò"}, {"attributes":{"color":"#e60000","bold" : true},"insert" : "Cannarsa"}, {"insert":" disse: \"lo prendo nell'ano nelle "
-}, { "attributes":{"italic":true},"insert" : "foreste!" }, { "insert":"\"" }]}, "line_attributes":{}}]}"))");
-
-    cout << h1 << endl;*/
-
-
+    std::cout << "\n\nDelta time t2-t1: "
+        << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()
+        << " microseconds" << std::endl;
 
     return 0;
 

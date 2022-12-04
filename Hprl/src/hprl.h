@@ -25,7 +25,6 @@ using json = nlohmann::json;
 
 inline unsigned int to_uint(char ch)
 {
-    
     return static_cast<unsigned int>(static_cast<unsigned char>(ch));
 }
 
@@ -42,7 +41,6 @@ hprl_string to_utf32(std::string const& s)
 namespace hprl {
 
     namespace FontManager {
-
 
         struct RasterizedGlyph {
 
@@ -233,7 +231,6 @@ namespace hprl {
 
         }
 
-        
         struct HprlTextFragment {
 
 
@@ -256,6 +253,14 @@ namespace hprl {
 
             }
 
+            HprlTextFragment(std::string content_utf8_ini, unsigned int fragment_height_px_ini) {
+                content_utf8 = content_utf8_ini;
+                content = to_utf32(content_utf8);
+                fragment_height_px = fragment_height_px_ini;
+
+            }
+
+
             hprl_string content;
             json text_attributes;
             std::string content_utf8;
@@ -274,10 +279,44 @@ namespace hprl {
 
 
 
-            HprlLine(json& line_ini) {
+            HprlLine(json& line_ini, unsigned short& ordered_list_count) {
 
                 max_char_height_line_px = 0;
                 line_attributes = line_ini["line_attributes"];
+
+                
+
+
+                if (line_attributes.contains("list")) {
+
+                    std::string type_of_list = line_attributes["list"];
+
+
+                    if (type_of_list.compare(std::string("ordered")) == 0) {
+
+                        
+                        std::string list_ordered = std::to_string(ordered_list_count).append(".");
+
+                        text_fragments.push_back(HprlTextFragment(list_ordered, DEFAULT_CHAR_HEIGHT_PX));
+
+                        ordered_list_count++;
+                    }
+
+                    if (type_of_list.compare(std::string("bullet")) == 0) {
+
+                        ordered_list_count = 1;
+                        text_fragments.push_back(HprlTextFragment("-", DEFAULT_CHAR_HEIGHT_PX));
+
+                    }
+
+
+
+                }
+                else {
+
+                    ordered_list_count = 1;
+
+                }
 
                 for (json& x : line_ini["content"]["ops"]) {
 
@@ -332,10 +371,9 @@ namespace hprl {
 
                     for (json& x : lines) {
 
-                        lines_vec.push_back(HprlLine(x));
+                        lines_vec.push_back(HprlLine(x, ordered_list_counter));
 
                     }
-
 
                 }
 
@@ -349,6 +387,7 @@ namespace hprl {
 
                 unsigned int width_px;
                 unsigned int height_px;
+                unsigned short ordered_list_counter = 1;
                 std::vector<HprlLine> lines_vec;
 
         };
@@ -672,12 +711,12 @@ namespace hprl {
 
         };
 
-
         class FontFaceNew {
 
 
         public:
 
+            const char* font_path;
             int ascent;
             int descent;
             int line_gap;
@@ -757,7 +796,6 @@ namespace hprl {
 
         private:
 
-            const char* font_path;
             unsigned char* font_data;
             stbtt_fontinfo font_info;
             char32_t first_char_ini;
@@ -810,14 +848,11 @@ namespace hprl {
 
         };
 
-
-
         class TextManager {
 
             public:
                 TextManager(BasicFontDescription& basic_ff_descr, char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel){
 
-                  
                     basic_font_faces_map.emplace("normal", FontFaceNew(basic_ff_descr.normal.font_path, first_char, char_count, heights_char_pixel, basic_ff_descr.normal.offset));
                     basic_font_faces_map.emplace("bold", FontFaceNew(basic_ff_descr.bold.font_path, first_char, char_count, heights_char_pixel, basic_ff_descr.bold.offset));
                     basic_font_faces_map.emplace("italic", FontFaceNew(basic_ff_descr.italic.font_path, first_char, char_count, heights_char_pixel, basic_ff_descr.italic.offset));
@@ -984,12 +1019,14 @@ namespace hprl {
 
                 void printTextFragment(HprlTextFragment& frag, unsigned char* work_buffer, unsigned char* single_chan_buf, int tex_w, int tex_h, int &xpos, int &baseline) {
 
-                    bool isStriked = false;
-                    bool isUnderlined = false;
                     json attributes = frag.text_attributes;
                     unsigned int height = frag.fragment_height_px;
                     FontColor color;
 
+                    int initial_xpos = xpos;
+                    int strike_height = baseline - int(height / 3);
+                    int underline_height = baseline + int(height / 10);
+                    int thickness_of_line = ceil(height / 10);
                     
 
 
@@ -1004,11 +1041,13 @@ namespace hprl {
                     }
 
                     
-                    FontFaceNew& work_font_face = basic_font_faces_map.at("normal");
+                    FontFaceNew work_font_face = basic_font_faces_map.at("normal");
 
                     if (!attributes.contains("bold") && !attributes.contains("italic")) {
 
                         work_font_face = basic_font_faces_map.at("normal");
+                        
+                        
 
                     }
 
@@ -1016,21 +1055,22 @@ namespace hprl {
                     if (attributes.contains("bold") && attributes.contains("italic")) {
 
                         work_font_face = basic_font_faces_map.at("bolditalic");
-
+                        
                     }
 
                     if (attributes.contains("bold") && !attributes.contains("italic")) {
 
 
                         work_font_face = basic_font_faces_map.at("bold");
+                        
 
 
                     }
 
-                    else {
+                    if (!attributes.contains("bold") && attributes.contains("italic")) {
 
                         work_font_face = basic_font_faces_map.at("italic");
-
+                        
                     }
 
 
@@ -1100,9 +1140,39 @@ namespace hprl {
 
                     }
 
+
+                        
+
                         xpos += (advance * scale_factor);
 
                         ++ch;
+                    }
+
+                    if (attributes.contains("strike")) {
+                        for (int y = strike_height; y < strike_height + thickness_of_line; y++) {
+                            for (int x = initial_xpos; x < xpos; x++) {
+
+                                work_buffer[y * tex_w * 4 + x * 4 + 0] = unsigned char(color.r * 255);
+                                work_buffer[y * tex_w * 4 + x * 4 + 1] = unsigned char(color.g * 255);
+                                work_buffer[y * tex_w * 4 + x * 4 + 2] = unsigned char(color.b * 255);
+                                work_buffer[y * tex_w * 4 + x * 4 + 3] = unsigned char(color.alpha * 255);
+
+                            }
+                        }
+                    }
+
+
+                    if (attributes.contains("underline")) {
+                        for (int y = underline_height; y < underline_height + thickness_of_line; y++) {
+                            for (int x = initial_xpos; x < xpos; x++) {
+
+                                work_buffer[y * tex_w * 4 + x * 4 + 0] = unsigned char(color.r * 255);
+                                work_buffer[y * tex_w * 4 + x * 4 + 1] = unsigned char(color.g * 255);
+                                work_buffer[y * tex_w * 4 + x * 4 + 2] = unsigned char(color.b * 255);
+                                work_buffer[y * tex_w * 4 + x * 4 + 3] = unsigned char(color.alpha * 255);
+
+                            }
+                        }
                     }
                     
 
@@ -1132,7 +1202,7 @@ namespace hprl {
                     hprl_string content = frag.content;
                     unsigned int height_px = frag.fragment_height_px;
 
-                    FontFaceNew& work_font_face = basic_font_faces_map.at("normal");
+                    FontFaceNew work_font_face = basic_font_faces_map.at("normal");
 
                     if (!attributes.contains("bold") && attributes.contains("italic")) {
 
@@ -1175,7 +1245,6 @@ namespace hprl {
 
 
         };
-
 
 
     }
