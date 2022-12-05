@@ -30,7 +30,7 @@ int main() {
 
     SetConsoleOutputCP(65001);
 
-    u8string in = u8R"({"lines":[{"content":{"ops":[{"attributes":{"underline":true,"strike":true,"italic":true,"size":"92px","color":"#e60000","bold":true},"insert":"Str"},{"attributes":{"underline":true,"strike":true,"italic":true,"size":"92px","color":"#9933ff","bold":true},"insert":"ike    "}]},"line_attributes":{}}],"dimensions":{"width":"1728px","height":"750px"}})";
+    u8string in = u8R"({"lines":[{"content":{"ops":[{"attributes":{"size":"35px"},"insert":"Sapone"}]},"line_attributes":{}}],"dimensions":{"width":"1383px","height":"578px"}})";
     
     vector<float> myHeights{50, 60, 70, 100};
 
@@ -49,18 +49,15 @@ int main() {
 
 
     auto t1 = Clock::now();
-    ///*font_fam.createTextTextureSingleFontFace('a', text, 50, myColor1);
-    //font_fam.createTextTextureSingleFontFace('b', text, 60, myColor1);
-    //font_fam.createTextTextureSingleFontFace('b', text, 70, myColor1);*/
-    //font_fam.createTextTextureSingleFontFace("bold", text, 100, myColor1);
     font_fam.parse(in);
     font_fam.printToConsole(in);
-    
     auto t2 = Clock::now();
    
     std::cout << "\n\nDelta time t2-t1: "
         << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()
         << " microseconds" << std::endl;
+
+
 
     return 0;
 
