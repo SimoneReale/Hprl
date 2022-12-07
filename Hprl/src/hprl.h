@@ -42,6 +42,7 @@ namespace hprl {
 
     namespace FontManager {
 
+        
         struct RasterizedGlyph {
 
             unsigned char* bitmap;
@@ -774,6 +775,33 @@ namespace hprl {
                 return font_instances_collection.at(height_char_pixel).glyphs[requested_char];
 
             }
+
+
+            RasterizedGlyph& getGlyphSubpixel(char32_t requested_char, float height_char_pixel, float x_shift) {
+
+                
+
+                    float scale_factor = stbtt_ScaleForPixelHeight(&font_info, height_char_pixel);
+
+                    
+                    int advance, lsb, x0, y0, x1, y1;
+                    stbtt_GetCodepointBitmapBoxSubpixel(&font_info, requested_char, scale_factor, scale_factor, x_shift, 0, &x0, &y0, &x1, &y1);
+                    stbtt_GetCodepointHMetrics(&font_info, requested_char, &advance, &lsb);
+
+                    int x_length = x1 - x0;
+                    int y_length = y1 - y0;
+                    unsigned char* temp_buffer = new unsigned char[x_length * y_length];
+                
+                    stbtt_MakeCodepointBitmapSubpixel(&font_info, temp_buffer, x_length, y_length, x_length, scale_factor, scale_factor, x_shift, 0, requested_char);
+                    
+                   
+                    RasterizedGlyph new_glyph = { temp_buffer, x0, y0, x1, y1, advance, lsb };
+
+                    return new_glyph;
+
+            }
+
+
             
             float getScaleFactor(float height_char_pixel) {
 
@@ -909,6 +937,7 @@ namespace hprl {
 
 
                     createTexture(cache_multi_line.at(h1));
+                    //createTextureSubpixel(cache_multi_line.at(h1));
 
                 }
 
@@ -950,19 +979,21 @@ namespace hprl {
                     unsigned char* single_channel_buff = new unsigned char[tex_h * tex_w];
                     int center_x_texture = ceil(tex_w / 2);
 
-                    for (int i = 0; i < tex_w * tex_h * 4; i++) {
+                    for (int i = 0; i < tex_w * tex_h; i++) {
 
-                        work_buffer[i] = 0;
+                        work_buffer[i * 4] = 0;
+                        work_buffer[i * 4 + 1] = 0;
+                        work_buffer[i * 4 + 2] = 0;
+                        work_buffer[i * 4 + 3] = 0;
 
                     }
 
                     for (int i = 0; i < tex_w * tex_h; i++) {
 
-                        single_channel_buff[i] = 0;
+                        single_channel_buff[i] = 1;
 
                     }
 
-                    
                     int ascent = basic_font_faces_map.at("normal").ascent;
                     int descent = basic_font_faces_map.at("normal").descent;
                     int line_gap = basic_font_faces_map.at("normal").line_gap;
@@ -1002,6 +1033,7 @@ namespace hprl {
 
 
                         for (HprlTextFragment frag : text.lines_vec[i].text_fragments) {
+
                             printTextFragment(frag, work_buffer, single_channel_buff, tex_w, tex_h, xpos, baseline);
                         }
 
@@ -1012,10 +1044,86 @@ namespace hprl {
                     }
 
 
-                    stbi_write_png("test.png", tex_w, tex_h, 4, work_buffer, tex_w * 4);
+                    //stbi_write_png("test_normal.png", tex_w, tex_h, 4, work_buffer , tex_w * 4);
 
                 }
 
+                void createTextureSubpixel(HprlMultiLineText& text) {
+
+
+                    int tex_w = text.width_px, tex_h = text.height_px;
+                    unsigned char* work_buffer = new unsigned char[tex_h * tex_w * 4];
+                    unsigned char* single_channel_buff = new unsigned char[tex_h * tex_w];
+                    int center_x_texture = ceil(tex_w / 2);
+
+                    for (int i = 0; i < tex_w * tex_h; i++) {
+
+                        work_buffer[i * 4] = 0;
+                        work_buffer[i * 4 + 1] = 0;
+                        work_buffer[i * 4 + 2] = 0;
+                        work_buffer[i * 4 + 3] = 0;
+
+                    }
+
+                    for (int i = 0; i < tex_w * tex_h; i++) {
+
+                        single_channel_buff[i] = 1;
+
+                    }
+
+                    int ascent = basic_font_faces_map.at("normal").ascent;
+                    int descent = basic_font_faces_map.at("normal").descent;
+                    int line_gap = basic_font_faces_map.at("normal").line_gap;
+
+                    float max_height_ini = text.lines_vec[0].max_char_height_line_px;
+                    int baseline = (int)(basic_font_faces_map.at("normal").ascent * basic_font_faces_map.at("normal").getScaleFactor(max_height_ini));
+
+
+
+                    for (int i = 0; i < text.lines_vec.size(); i++) {
+
+
+                        json line_attributes = text.lines_vec[i].line_attributes;
+                        float xpos = 0;
+
+
+
+                        if (line_attributes.contains("align")) {
+
+                            std::string alignment = line_attributes["align"];
+
+
+
+                            if (alignment.compare(std::string("center")) == 0) {
+
+                                xpos = center_x_texture - ceil(getLineLength(text.lines_vec[i]) / 2);
+                            }
+
+                            if (alignment.compare(std::string("right")) == 0) {
+
+                                xpos = tex_w - getLineLength(text.lines_vec[i]);
+                            }
+
+
+                        }
+
+
+
+                        for (HprlTextFragment frag : text.lines_vec[i].text_fragments) {
+
+                            printTextFragmentSubpixel(frag, work_buffer, single_channel_buff, tex_w, tex_h, xpos, baseline);
+                        }
+
+                        if (i < text.lines_vec.size() - 1) {
+                            int max_height = text.lines_vec[i + 1].max_char_height_line_px;
+                            baseline += (ascent - descent + line_gap) * basic_font_faces_map.at("normal").getScaleFactor(max_height);
+                        }
+                    }
+
+
+                    stbi_write_png("test_subpixel.png", tex_w, tex_h, 4, work_buffer, tex_w * 4);
+
+                }
 
                 void printTextFragment(HprlTextFragment& frag, unsigned char* work_buffer, unsigned char* single_chan_buf, int tex_w, int tex_h, int &xpos, int &baseline) {
 
@@ -1122,6 +1230,19 @@ namespace hprl {
 
                                 }
 
+                                
+                                if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] > 0 && single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] < 255) {
+                                    //red
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = unsigned char(color.r * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                                    //green
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = unsigned char(color.g * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                                    //blue
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = unsigned char(color.b * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                                    //alpha
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)];
+                                }
+
+
                                 else {
 
                                     //red
@@ -1175,6 +1296,177 @@ namespace hprl {
 
                 }
 
+                void printTextFragmentSubpixel(HprlTextFragment& frag, unsigned char* work_buffer, unsigned char* single_chan_buf, int tex_w, int tex_h, float& xpos, int& baseline) {
+
+                    json attributes = frag.text_attributes;
+                    unsigned int height = frag.fragment_height_px;
+                    FontColor color;
+
+                    int initial_xpos = xpos;
+                    int strike_height = baseline - int(height / 3);
+                    int underline_height = baseline + int(height / 10);
+                    int thickness_of_line = ceil(height / 10);
+
+
+
+                    if (attributes.contains("color")) {
+
+                        color = FontColor::colorConverter(attributes["color"], 1.0f);
+
+                    }
+                    else {
+
+                        color = FontColor{ 0.0f, 0.0f, 0.0f, 1.0f };
+                    }
+
+
+                    FontFaceNew work_font_face = basic_font_faces_map.at("normal");
+
+                    if (!attributes.contains("bold") && !attributes.contains("italic")) {
+
+                        work_font_face = basic_font_faces_map.at("normal");
+
+
+
+                    }
+
+
+                    if (attributes.contains("bold") && attributes.contains("italic")) {
+
+                        work_font_face = basic_font_faces_map.at("bolditalic");
+
+                    }
+
+                    if (attributes.contains("bold") && !attributes.contains("italic")) {
+
+
+                        work_font_face = basic_font_faces_map.at("bold");
+
+
+
+                    }
+
+                    if (!attributes.contains("bold") && attributes.contains("italic")) {
+
+                        work_font_face = basic_font_faces_map.at("italic");
+
+                    }
+
+
+
+                    int ch = 0;
+                    hprl_string text = frag.content;
+
+                    float scale_factor = work_font_face.getScaleFactor(height);
+
+
+                    while (to_uint(text[ch])) {
+                        unsigned int c = to_uint(text[ch]);
+                        float x_shift = xpos - (float)floor(xpos);
+
+                        RasterizedGlyph& glyph = work_font_face.getGlyphSubpixel(c, height, x_shift);
+
+                        int advance = glyph.advance;
+                        int lsb = glyph.lsb;
+                        int x0 = glyph.x0, y0 = glyph.y0, x1 = glyph.x1, y1 = glyph.y1;
+
+                        unsigned char* temp_buffer = glyph.bitmap;
+
+
+                        for (int j = y0; j < y1; j++) {
+                            for (int i = x0; i < x1; i++) {
+                                if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] != 0 && temp_buffer[(j - y0) * (x1 - x0) + (i - x0)] == 0) {
+
+                                }
+                                else {
+
+                                    single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] = temp_buffer[(j - y0) * (x1 - x0) + (i - x0)];
+                                }
+                            }
+                        }
+
+                        for (int j = y0; j < y1; j++) {
+                            for (int i = x0; i < x1; i++) {
+
+                                if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] == 0) {
+
+                                    //red
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = 0;
+                                    //green
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = 0;
+                                    //blue
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = 0;
+                                    //alpha
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = 0;
+
+
+                                }
+
+
+                                if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] > 0 && single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] < 255) {
+                                    //red
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = unsigned char(color.r * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                                    //green
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = unsigned char(color.g * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                                    //blue
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = unsigned char(color.b * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                                    //alpha
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)];
+                                }
+
+
+                                else {
+
+                                    //red
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = unsigned char(color.r * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                                    //green
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = unsigned char(color.g * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                                    //blue
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = unsigned char(color.b * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                                    //alpha
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = unsigned char(color.alpha * 255);
+
+                                }
+
+
+                            }
+
+                        }
+
+                        xpos += (advance * scale_factor);
+
+                        ++ch;
+                    }
+
+                    if (attributes.contains("strike")) {
+                        for (int y = strike_height; y < strike_height + thickness_of_line; y++) {
+                            for (int x = initial_xpos; x < xpos; x++) {
+
+                                work_buffer[y * tex_w * 4 + x * 4 + 0] = unsigned char(color.r * 255);
+                                work_buffer[y * tex_w * 4 + x * 4 + 1] = unsigned char(color.g * 255);
+                                work_buffer[y * tex_w * 4 + x * 4 + 2] = unsigned char(color.b * 255);
+                                work_buffer[y * tex_w * 4 + x * 4 + 3] = unsigned char(color.alpha * 255);
+
+                            }
+                        }
+                    }
+
+
+                    if (attributes.contains("underline")) {
+                        for (int y = underline_height; y < underline_height + thickness_of_line; y++) {
+                            for (int x = initial_xpos; x < xpos; x++) {
+
+                                work_buffer[y * tex_w * 4 + x * 4 + 0] = unsigned char(color.r * 255);
+                                work_buffer[y * tex_w * 4 + x * 4 + 1] = unsigned char(color.g * 255);
+                                work_buffer[y * tex_w * 4 + x * 4 + 2] = unsigned char(color.b * 255);
+                                work_buffer[y * tex_w * 4 + x * 4 + 3] = unsigned char(color.alpha * 255);
+
+                            }
+                        }
+                    }
+
+
+                }
 
                 int getLineLength(HprlLine& line) {
 
@@ -1191,7 +1483,6 @@ namespace hprl {
 
 
                 }
-
 
                 int getFragmentLength(HprlTextFragment& frag) {
 
@@ -1238,53 +1529,7 @@ namespace hprl {
 
                 }
 
-                
-
-
         };
-
-        void TestPrint() {
-
-
-            unsigned char screen[20][79];
-
-            stbtt_fontinfo font;
-            int i, j, ascent, baseline, ch = 0;
-            float scale, xpos = 2; // leave a little padding in case the character extends left
-            const char* text = "Heljo World!"; // intentionally misspelled to show 'lj' brokenness
-
-            stbtt_InitFont(&font, readFontData("c:/windows/fonts/arialbd.ttf"), 0);
-
-            scale = stbtt_ScaleForPixelHeight(&font, 15);
-            stbtt_GetFontVMetrics(&font, &ascent, 0, 0);
-            baseline = (int)(ascent * scale);
-
-            while (text[ch]) {
-                int advance, lsb, x0, y0, x1, y1;
-                float x_shift = xpos - (float)floor(xpos);
-                stbtt_GetCodepointHMetrics(&font, text[ch], &advance, &lsb);
-                stbtt_GetCodepointBitmapBoxSubpixel(&font, text[ch], scale, scale, x_shift, 0, &x0, &y0, &x1, &y1);
-                stbtt_MakeCodepointBitmapSubpixel(&font, &screen[baseline + y0][(int)xpos + x0], x1 - x0, y1 - y0, 79, scale, scale, x_shift, 0, text[ch]);
-                // note that this stomps the old data, so where character boxes overlap (e.g. 'lj') it's wrong
-                // because this API is really for baking character bitmaps into textures. if you want to render
-                // a sequence of characters, you really need to render each bitmap to a temp buffer, then
-                // "alpha blend" that into the working buffer
-                xpos += (advance * scale);
-                if (text[ch + 1])
-                    xpos += scale * stbtt_GetCodepointKernAdvance(&font, text[ch], text[ch + 1]);
-                ++ch;
-            }
-
-            /*for (j = 0; j < 20; ++j) {
-                for (i = 0; i < 78; ++i)
-                    putchar(" .:ioVM@"[screen[j][i] >> 5]);
-                putchar('\n');
-            }*/
-
-
-            stbi_write_png("test.png", 79, 20, 1, screen, 79);
-
-        }
 
 
 
