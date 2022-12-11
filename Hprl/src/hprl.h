@@ -748,9 +748,8 @@ namespace hprl {
 
                 }
                 else {
-
+                    
                     float scale_factor = font_instances_collection[height_char_pixel].scale_factor;
-
                     if (!font_instances_collection.at(height_char_pixel).glyphs.contains(requested_char)) {
 
                         // not found
@@ -769,6 +768,7 @@ namespace hprl {
                         font_instances_collection.at(height_char_pixel).glyphs[requested_char] = new_glyph;
 
                     }
+                    
                 }
 
 
@@ -927,12 +927,6 @@ namespace hprl {
 
                         cache_multi_line.emplace(h1, HprlMultiLineText(width, height, lines));
 
-
-                        for (HprlLine x : cache_multi_line.at(h1).lines_vec) {
-
-                            std::cout << "Lunghezza linea: " << getLineLength(x) << std::endl;
-                        }
-
                     }
 
 
@@ -959,8 +953,6 @@ namespace hprl {
 
 
             private:
-
-                
 
                 std::unordered_map<std::string, FontFaceNew> basic_font_faces_map;
 
@@ -1044,7 +1036,7 @@ namespace hprl {
                     }
 
 
-                    //stbi_write_png("test_normal.png", tex_w, tex_h, 4, work_buffer , tex_w * 4);
+                    stbi_write_png("test_normal.png", tex_w, tex_h, 4, work_buffer , tex_w * 4);
 
                 }
 
@@ -1130,6 +1122,7 @@ namespace hprl {
                     json attributes = frag.text_attributes;
                     unsigned int height = frag.fragment_height_px;
                     FontColor color;
+                    FontColor color_background;
 
                     int initial_xpos = xpos;
                     int strike_height = baseline - int(height / 3);
@@ -1147,6 +1140,9 @@ namespace hprl {
                           
                         color = FontColor{ 0.0f, 0.0f, 0.0f, 1.0f };
                     }
+
+
+                    
 
                     
                     FontFaceNew work_font_face = basic_font_faces_map.at("normal");
@@ -1201,10 +1197,11 @@ namespace hprl {
                         unsigned char* temp_buffer = glyph.bitmap;
 
 
+                      
                         for (int j = y0; j < y1; j++) {
                             for (int i = x0; i < x1; i++) {
-                                if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] != 0 && temp_buffer[(j - y0) * (x1 - x0) + (i - x0)] == 0) {
 
+                                if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] != 0 && temp_buffer[(j - y0) * (x1 - x0) + (i - x0)] == 0) {
                                 }
                                 else {
 
@@ -1218,14 +1215,15 @@ namespace hprl {
 
                                 if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] == 0) {
 
+                                    
                                     //red
-                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = 0;
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = 255;
                                     //green
-                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = 0;
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = 255;
                                     //blue
-                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = 0;
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = 255;
                                     //alpha
-                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = 0;
+                                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = 255;
 
 
                                 }
@@ -1241,7 +1239,6 @@ namespace hprl {
                                     //alpha
                                     work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)];
                                 }
-
 
                                 else {
 
@@ -1535,4 +1532,3 @@ namespace hprl {
 
 
     }
-}

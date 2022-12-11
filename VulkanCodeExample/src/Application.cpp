@@ -25,12 +25,16 @@ using namespace std;
 //CACHE DELLE TEXTURE
 //VERSIONE INCREMENTALE DELLA CREATE TEXTURE
 //ASPECT RATIO NELLA CONVERSIONE A RGBA32BIT
+//
+
+
+//DA VEDERE LA CACHE CHE NON FUNZIONA
 
 int main() {
 
     SetConsoleOutputCP(65001);
 
-    u8string in = u8R"({"lines":[{"content":{"ops":[{"attributes":{"size":"25px","color":"#e60000"},"insert":"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque mollis dolor magna, quis posuere nunc commodo"}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"size":"25px","color":"#e60000"},"insert":"quis. Nunc non nibh et dolor fringilla efficitur ut sit amet ex. Integer tellus nunc, molestie quis ex a, varius fermentum nibh."}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"size":"25px","color":"#e60000"},"insert":"Proin eu leo mauris. Etiam finibus tellus placerat, ornare nisl sed, egestas ipsum. Praesent in auctor leo. Integer mattis "}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"size":"25px","color":"#e60000"},"insert":"lectus sit amet sapien placerat, sed pulvinar purus tempor. Integer malesuada magna id dignissim egestas. Ut purus sem, "}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"size":"25px","color":"#e60000"},"insert":"elementum sed quam quis, feugiat tempus turpis. Sed sit amet arcu vel mauris elementum sollicitudin. Suspendisse nec "}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"size":"25px","color":"#e60000"},"insert":"mauris sed tortor bibendum lobortis. Cras id malesuada sapien. Mauris nec tincidunt quam. Vivamus vestibulum faucibus"}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"size":"25px","color":"#e60000"},"insert":"bibendum. Phasellus varius egestas risus a iaculis. In nec mi et sem placerat vestibulum."}]},"line_attributes":{}}],"dimensions":{"width":"1383px","height":"578px"}})";
+    u8string in = u8R"({"lines":[{"content":{"ops":[{"attributes":{"size":"30px","background":"#e60000"},"insert":"Sapone"}]},"line_attributes":{}}],"dimensions":{"width":"1383px","height":"578px"}})";
     
     vector<float> myHeights{25};
 
