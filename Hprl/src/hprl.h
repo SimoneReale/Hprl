@@ -79,7 +79,6 @@ unsigned char* grayscale_dilation(unsigned char* in, unsigned int in_width, unsi
         return out;
 
 }
-
 unsigned char* shear(unsigned char* in, unsigned int in_width, unsigned int in_height) {
     
 
@@ -115,12 +114,13 @@ unsigned char* shear(unsigned char* in, unsigned int in_width, unsigned int in_h
 }
 
 
-struct Texture {
+class Texture {
 
+public:
     unsigned char* texture;
     unsigned int width;
     unsigned int height;
-    unsigned long size_bytes;
+    
 
     Texture(unsigned char* texture_ini, unsigned int width_ini, unsigned int height_ini) {
 
@@ -128,23 +128,15 @@ struct Texture {
         width = width_ini;
         height = height_ini;
 
-        size_bytes = sizeof(this) + sizeof(unsigned char) * width * height * 4;
-
     }
 
     Texture() {
         texture = nullptr;
         width = 0;
         height = 0;
-        size_bytes = 0;
     }
 
-    };
-
-class TextureSizeHandler {
-
-    public:
-        static void resize_texture(unsigned char* dest, int dwidth, int dheight, unsigned char* src, int swidth, int sheight)
+    static void resize_texture(unsigned char* dest, int dwidth, int dheight, unsigned char* src, int swidth, int sheight)
     {
         if (dwidth == swidth && sheight == dheight)
             memcpy(dest, src, dwidth * dheight * 4);
@@ -154,10 +146,10 @@ class TextureSizeHandler {
             shrink_average_method(dest, dwidth, dheight, src, swidth, sheight);
     }
 
-    private:
-        static void shrink_average_method(unsigned char* dest, int dwidth, int dheight, unsigned char* src, int swidth, int sheight)
+private:
+    static void shrink_average_method(unsigned char* dest, int dwidth, int dheight, unsigned char* src, int swidth, int sheight)
     {
-        #define clamp(x,low,high) (x) < (low) ? (low) : (x) > (high) ? (high) : (x)
+#define clamp(x,low,high) (x) < (low) ? (low) : (x) > (high) ? (high) : (x)
 
         int x, y;
         int i, ii;
@@ -276,7 +268,7 @@ class TextureSizeHandler {
 
 
     }
-        static void bilinear_interpolation(unsigned char* dest, int dwidth, int dheight, unsigned char* src, int swidth, int sheight)
+    static void bilinear_interpolation(unsigned char* dest, int dwidth, int dheight, unsigned char* src, int swidth, int sheight)
     {
         float a, b;
         float red, green, blue, alpha;
@@ -404,53 +396,10 @@ class TextureSizeHandler {
         dest[(y * dwidth + x) * 4 + 3] = src[((sheight - 1) * swidth + swidth - 1) * 4 + 3];
     }
 
-};
-
-struct RasterizedGlyph {
-
-    unsigned char* bitmap;
-    int x0, y0, x1, y1;
-    int advance;
-    int lsb;
-
-};
-
-struct FontInstance {
-
-    float scale_factor;
-    int max_h_bbox_font;
-    int max_w_bbox_font;
-    std::unordered_map<char32_t, RasterizedGlyph> glyphs;
-
-};
-
-struct FontBoundingBox {
-
-    int x0, y0, x1, y1;
-
-};
-
-struct FontColor {
-
-    float r, g, b, alpha;
-    static struct FontColor colorConverter(std::string hexValue, float alpha)
-    {
-        if (hexValue.at(0) == '#') {
-            hexValue.erase(0, 1);
-        }
-
-        int hex = stoul(hexValue, nullptr, 16);
-        struct FontColor rgbaColor;
-        rgbaColor.r = ((hex >> 16) & 0xFF) / 255.0;
-        rgbaColor.g = ((hex >> 8) & 0xFF) / 255.0;
-        rgbaColor.b = ((hex) & 0xFF) / 255.0;
-        rgbaColor.alpha = alpha;
-
-        return rgbaColor;
-    }
 
 
-};
+
+    };
 
 struct FontFaceDescription {
 
@@ -494,7 +443,7 @@ struct FontFaceDescription {
 
 };
 
-struct BasicFontDescription {
+struct FontFamilyInitializer {
 
     FontFaceDescription* normal;
     FontFaceDescription* bold;
@@ -502,7 +451,7 @@ struct BasicFontDescription {
     FontFaceDescription* bolditalic;
     std::vector<FontFaceDescription> other_ff_descr;
 
-    BasicFontDescription(FontFaceDescription* normal_ini, FontFaceDescription* bold_ini, FontFaceDescription* italic_ini, FontFaceDescription* bolditalic_ini, std::vector<FontFaceDescription> other_ff_descr_ini) {
+    FontFamilyInitializer(FontFaceDescription* normal_ini, FontFaceDescription* bold_ini, FontFaceDescription* italic_ini, FontFaceDescription* bolditalic_ini, std::vector<FontFaceDescription> other_ff_descr_ini) {
                 
         if (normal_ini == nullptr) {
             throw std::runtime_error("NORMAL FONT CANT BE NULLPTR");
@@ -529,391 +478,458 @@ struct BasicFontDescription {
            
 };
 
-struct HprlTextFragment {
-
-
-    HprlTextFragment(json& text_frag) {
-
-        content = to_utf32(text_frag["insert"]);
-        content_utf8 = text_frag["insert"];
-        text_attributes = text_frag["attributes"];
-
-        if (text_attributes.contains("size")) {
-
-            std::string size_s = text_attributes["size"];
-            fragment_height_px = std::stoul(size_s.substr(0, size_s.size() - 2).c_str());
-        }
-        else {
-
-            fragment_height_px = DEFAULT_CHAR_HEIGHT_PX;
-
-        }
-
-    }
-    
-    HprlTextFragment(std::string content_utf8_ini, unsigned int fragment_height_px_ini) {
-        content_utf8 = content_utf8_ini;
-        content = to_utf32(content_utf8);
-        fragment_height_px = fragment_height_px_ini;
-
-    }
-
-
-
-    static HprlTextFragment createTextFragment(std::string content_ini) {
-
-        return HprlTextFragment(content_ini, DEFAULT_CHAR_HEIGHT_PX);
-
-    }
-
-
-    HprlTextFragment& addSizePxToFragment(unsigned int size_px) {
-
-        text_attributes["size"] = std::to_string(size_px).append("px");
-        fragment_height_px = size_px;
-        return *this;
-
-    }
-
-    HprlTextFragment& addColorToFragment(std::string hex_value) {
-
-        text_attributes["color"] = hex_value;
-        return *this;
-
-    }
-
-    HprlTextFragment& addUnderlineToFragment() {
-
-        text_attributes["underline"] = true;
-        return *this;
-    }
-
-    HprlTextFragment& addStrikeToFragment() {
-
-        text_attributes["strike"] = true;
-        return *this;
-    }
-
-    HprlTextFragment& addBoldnessToFragment() {
-
-        text_attributes["bold"] = true;
-        return *this;
-    }
-
-    HprlTextFragment& addItalicToFragment(HprlTextFragment& frag) {
-
-        text_attributes["italic"] = true;
-        return *this;
-    }
-
-
-    hprl_string content;
-    json text_attributes;
-    std::string content_utf8;
-    unsigned int fragment_height_px;
-
-};
-
-struct HprlLine {
-
-
-
-    HprlLine(json& line_ini, unsigned short& ordered_list_count) {
-
-        max_char_height_line_px = 0;
-        line_attributes = line_ini["line_attributes"];
-
-
-
-
-        if (line_attributes.contains("list")) {
-
-            std::string type_of_list = line_attributes["list"];
-
-
-            if (type_of_list.compare(std::string("ordered")) == 0) {
-
-
-                std::string list_ordered = std::to_string(ordered_list_count).append(".");
-
-                text_fragments.push_back(HprlTextFragment(list_ordered, DEFAULT_CHAR_HEIGHT_PX));
-
-                ordered_list_count++;
-            }
-
-            if (type_of_list.compare(std::string("bullet")) == 0) {
-
-                ordered_list_count = 1;
-                text_fragments.push_back(HprlTextFragment("-", DEFAULT_CHAR_HEIGHT_PX));
-
-            }
-
-
-
-        }
-        else {
-
-            ordered_list_count = 1;
-
-        }
-
-        for (json& x : line_ini["content"]["ops"]) {
-
-            text_fragments.push_back(HprlTextFragment(x));
-
-        }
-
-        for (auto& x : text_fragments) {
-
-            if (x.fragment_height_px > max_char_height_line_px) {
-
-                max_char_height_line_px = x.fragment_height_px;
-
-            }
-
-        }
-
-
-
-
-    }
-
-    std::vector<HprlTextFragment> text_fragments;
-    json line_attributes;
-    unsigned int max_char_height_line_px;
-
-
-
-};
-
-struct HprlText {
-
-public:
-
-    HprlText(unsigned int width_px_ini, unsigned int height_px_ini, json& lines) {
-
-        width_px = width_px_ini;
-        height_px = height_px_ini;
-        left_margin_px = DEFAULT_LEFT_MARGIN_PX;
-        upper_margin_px = DEFAULT_UPPER_MARGIN;
-
-        for (json& x : lines) {
-
-            lines_vec.push_back(HprlLine(x, ordered_list_counter));
-
-        }
-
-    }
-    HprlText(unsigned int width_px_ini, unsigned int height_px_ini, unsigned int left_margin_px_ini, unsigned int upper_margin_px_ini, std::vector<HprlLine> lines_vec_ini) {
-
-        width_px = width_px_ini;
-        height_px = height_px_ini;
-        left_margin_px = left_margin_px_ini;
-        upper_margin_px = upper_margin_px_ini;
-        lines_vec = lines_vec_ini;
-
-    }
-
-
-    unsigned int width_px;
-    unsigned int height_px;
-    unsigned int left_margin_px;
-    unsigned int upper_margin_px;
-    unsigned short ordered_list_counter = 1;
-    std::vector<HprlLine> lines_vec;
-
-};
-
-class FontFace {
-
-
-public:
-
-    int ascent;
-    int descent;
-    int line_gap;
-    FontBoundingBox font_bbox;
-
-    FontFace(unsigned char* font_data_ini, char32_t first_char, char32_t char_count, std::vector<float> heights_char_pixel, int offset);
-
-    FontFace() = delete;
-
-
-
-    RasterizedGlyph& getGlyph(char32_t requested_char, float height_char_pixel);
-    float getScaleFactor(float height_char_pixel);
-
-    FontFace& makeArtificialBold() {
-
-        std::cout << "Sono nel make artifcial" << std::endl;
-
-        std::cout << "Size: " << font_instances_collection.size() << std::endl;
-
-        for (auto& f : font_instances_collection) {
-
-            FontInstance f_ins = f.second;
-
-            for (auto& r : f_ins.glyphs) {
-
-                RasterizedGlyph r_glyph = r.second;
-
-                unsigned int bitmap_width = r_glyph.x1 - r_glyph.x0;
-                unsigned int bitmap_height = r_glyph.y1 - r_glyph.y0;
-
-                r_glyph.bitmap = grayscale_dilation(r_glyph.bitmap, bitmap_width, bitmap_height, DEFAULT_DILATION_KERNEL_SIZE);
-
-                
-
-                r_glyph.advance = int(r_glyph.advance * 1.10);
-
-            }
-
-        }
-
-        return *this;
-
-
-    }
-
-
-
-private:
-
-    unsigned char* font_data;
-    stbtt_fontinfo font_info;
-    char32_t first_char_ini;
-    char32_t char_count_ini;
-
-
-    std::map<float, FontInstance> font_instances_collection;
-
-
-    void initializeFontFace(char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel);
-
-
-};
-
-class LRUTextureCache {
-
-  public:
-
-    LRUTextureCache(int capacity)
-    {
-        cap = capacity;
-        head->next = tail;
-        tail->prev = head;
-    }
-    LRUTextureCache() {
-
-        cap = DEFAULT_TEXTURE_CACHE_CAPACITY;
-    }
-
-    bool at(std::size_t key, Texture& texture)
-    {
-        if (m.find(key) != m.end())
-        {
-            node* res = m[key];
-            m.erase(key);
-            Texture ans = res->value;
-            deletenode(res);
-            addnode(res);
-            m[key] = head->next;
-            texture = ans;
-            return true;
-        }
-
-        return false;
-    }
-    void emplace(std::size_t key, Texture value)
-    {
-        if (m.find(key) != m.end())
-        {
-            node* exist = m[key];
-            m.erase(key);
-            deletenode(exist);
-        }
-
-        if (m.size() == cap)
-        {
-            m.erase(tail->prev->key);
-            deletenode(tail->prev);
-        }
-        addnode(new node(key, value));
-        m[key] = head->next;
-    }
-    bool contains(std::size_t key) {
-        if (m.find(key) != m.end())
-        {
-            return true;
-        }
-        
-        return false;
-    }
-
-  private:
-
-    class node
-    {
-    public:
-        std::size_t key;
-        Texture value;
-        node* prev;
-        node* next;
-
-        node(std::size_t key_ini, Texture value_ini)
-        {
-            key = key_ini;
-            value = value_ini;
-        }
-    };
-    node* head = new node(0, Texture());
-    node* tail = new node(0, Texture());
-    int cap;
-    std::map<std::size_t, node*> m;
-
-    void addnode(node* temp)
-    {
-        node* dummy = head->next;
-        head->next = temp;
-        temp->prev = head;
-        temp->next = dummy;
-        dummy->prev = temp;
-    }
-    void deletenode(node* temp)
-    {
-        node* delnext = temp->next;
-        node* delprev = temp->prev;
-        delnext->prev = delprev;
-        delprev->next = delnext;
-    }
-
-};
-
-class TextManager {
+class FontFamilyManager {
 
 public:
             
-    TextManager(BasicFontDescription& basic_ff_descr, char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel, unsigned int cache_capacity);
+    FontFamilyManager(FontFamilyInitializer& basic_ff_descr, char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel, unsigned int cache_capacity);
 
-    TextManager() = delete;
+    FontFamilyManager() = delete;
 
-
-    std::size_t parse(std::u8string input, Texture& texture);
-
-    bool getTextureFromCache(std::size_t hash, Texture& dst_texture);
+    std::size_t parseFromEditor(std::u8string input, Texture& texture);
 
     std::size_t getHashFromInputString(std::u8string input);
-
-    unsigned char* createTexture(HprlText& text);
 
 
 
 private:
 
+    struct FontColor {
+
+        float r, g, b, alpha;
+
+        static FontColor cvtColorFromHexToFontColor(std::string hexValue, float alpha)
+        {
+            if (hexValue.at(0) == '#') {
+                hexValue.erase(0, 1);
+            }
+
+            int hex = stoul(hexValue, nullptr, 16);
+            struct FontColor rgbaColor;
+            rgbaColor.r = ((hex >> 16) & 0xFF) / 255.0;
+            rgbaColor.g = ((hex >> 8) & 0xFF) / 255.0;
+            rgbaColor.b = ((hex) & 0xFF) / 255.0;
+            rgbaColor.alpha = alpha;
+
+            return rgbaColor;
+        }
+        static std::string cvtColorToHexString(unsigned char red, unsigned char green, unsigned char blue) {
+
+            char hexcol[16];
+            snprintf(hexcol, sizeof hexcol, "#%02x%02x%02x", red, green, blue);
+            return hexcol;
+        }
+
+    };
+
+    struct RasterizedGlyph {
+
+        unsigned char* bitmap;
+        int x0, y0, x1, y1;
+        int advance;
+        int lsb;
+
+    };
+
+    struct FontInstance {
+
+        float scale_factor;
+        int max_h_bbox_font;
+        int max_w_bbox_font;
+        std::unordered_map<char32_t, RasterizedGlyph> glyphs;
+
+    };
+
+    struct FontBoundingBox {
+
+        int x0, y0, x1, y1;
+
+    };
+
+    class FontFace {
+
+
+    public:
+
+        int ascent;
+        int descent;
+        int line_gap;
+        FontBoundingBox font_bbox;
+
+        FontFace(unsigned char* font_data_ini, char32_t first_char, char32_t char_count, std::vector<float> heights_char_pixel, int offset);
+
+        FontFace() = delete;
+
+
+
+        RasterizedGlyph& getGlyph(char32_t requested_char, float height_char_pixel);
+        float getScaleFactor(float height_char_pixel);
+
+        void makeArtificialBold() {
+
+            std::cout << "Sono nel make artificial" << std::endl;
+
+            std::cout << "Size: " << font_instances_collection.size() << std::endl;
+
+            for (auto& f : font_instances_collection) {
+
+                FontInstance f_ins = f.second;
+
+                for (auto& r : f_ins.glyphs) {
+
+                    RasterizedGlyph r_glyph = r.second;
+
+                    unsigned int bitmap_width = r_glyph.x1 - r_glyph.x0;
+                    unsigned int bitmap_height = r_glyph.y1 - r_glyph.y0;
+
+                    std::cout << "Prima della delation nella make bold" << std::endl;
+                    std::cout << "Width: " << bitmap_width << std::endl;
+                    r_glyph.bitmap = grayscale_dilation(r_glyph.bitmap, bitmap_width, bitmap_height, DEFAULT_DILATION_KERNEL_SIZE);
+
+
+                    r_glyph.advance = int(r_glyph.advance * 1.10);
+
+                }
+
+            }
+
+        }
+
+        std::map<float, FontInstance> font_instances_collection;
+
+
+    private:
+
+        unsigned char* font_data;
+        stbtt_fontinfo font_info;
+        char32_t first_char_ini;
+        char32_t char_count_ini;
+
+
+
+
+        void initializeFontFace(char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel);
+
+
+    };
+
+    class LRUTextureCache {
+
+    public:
+
+        LRUTextureCache(int capacity)
+        {
+            cap = capacity;
+            head->next = tail;
+            tail->prev = head;
+        }
+        LRUTextureCache() {
+
+            cap = DEFAULT_TEXTURE_CACHE_CAPACITY;
+        }
+
+        bool at(std::size_t key, Texture& texture)
+        {
+            if (m.find(key) != m.end())
+            {
+                node* res = m[key];
+                m.erase(key);
+                Texture ans = res->value;
+                deletenode(res);
+                addnode(res);
+                m[key] = head->next;
+                texture = ans;
+                return true;
+            }
+
+            return false;
+        }
+        void emplace(std::size_t key, Texture value)
+        {
+            if (m.find(key) != m.end())
+            {
+                node* exist = m[key];
+                m.erase(key);
+                deletenode(exist);
+            }
+
+            if (m.size() == cap)
+            {
+                m.erase(tail->prev->key);
+                deletenode(tail->prev);
+            }
+            addnode(new node(key, value));
+            m[key] = head->next;
+        }
+        bool contains(std::size_t key) {
+            if (m.find(key) != m.end())
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+    private:
+
+        class node
+        {
+        public:
+            std::size_t key;
+            Texture value;
+            node* prev;
+            node* next;
+
+            node(std::size_t key_ini, Texture value_ini)
+            {
+                key = key_ini;
+                value = value_ini;
+            }
+        };
+        node* head = new node(0, Texture());
+        node* tail = new node(0, Texture());
+        int cap;
+        std::map<std::size_t, node*> m;
+
+        void addnode(node* temp)
+        {
+            node* dummy = head->next;
+            head->next = temp;
+            temp->prev = head;
+            temp->next = dummy;
+            dummy->prev = temp;
+        }
+        void deletenode(node* temp)
+        {
+            node* delnext = temp->next;
+            node* delprev = temp->prev;
+            delnext->prev = delprev;
+            delprev->next = delnext;
+        }
+
+    };
+
+    struct HprlTextFragment {
+
+
+        HprlTextFragment(json& text_frag) {
+
+            content = to_utf32(text_frag["insert"]);
+            content_utf8 = text_frag["insert"];
+            text_attributes = text_frag["attributes"];
+
+            if (text_attributes.contains("size")) {
+
+                std::string size_s = text_attributes["size"];
+                fragment_height_px = std::stoul(size_s.substr(0, size_s.size() - 2).c_str());
+            }
+            else {
+
+                fragment_height_px = DEFAULT_CHAR_HEIGHT_PX;
+
+            }
+
+        }
+
+        HprlTextFragment(std::string content_utf8_ini, unsigned int fragment_height_px_ini) {
+            content_utf8 = content_utf8_ini;
+            content = to_utf32(content_utf8);
+            fragment_height_px = fragment_height_px_ini;
+
+        }
+
+
+
+        static HprlTextFragment createTextFragment(std::string content_ini) {
+
+            return HprlTextFragment(content_ini, DEFAULT_CHAR_HEIGHT_PX);
+
+        }
+
+
+        /*HprlTextFragment& addSizePxToFragment(unsigned int size_px) {
+
+            text_attributes["size"] = std::to_string(size_px).append("px");
+            fragment_height_px = size_px;
+            return *this;
+
+        }
+
+        HprlTextFragment& addColorToFragment(std::string hex_value) {
+
+            text_attributes["color"] = hex_value;
+            return *this;
+
+        }
+
+        HprlTextFragment& addUnderlineToFragment() {
+
+            text_attributes["underline"] = true;
+            return *this;
+        }
+
+        HprlTextFragment& addStrikeToFragment() {
+
+            text_attributes["strike"] = true;
+            return *this;
+        }
+
+        HprlTextFragment& addBoldnessToFragment() {
+
+            text_attributes["bold"] = true;
+            return *this;
+        }
+
+        HprlTextFragment& addItalicToFragment(HprlTextFragment& frag) {
+
+            text_attributes["italic"] = true;
+            return *this;
+        }*/
+
+
+        hprl_string content;
+        json text_attributes;
+        std::string content_utf8;
+        unsigned int fragment_height_px;
+
+    };
+
+    struct HprlLine {
+
+
+
+        HprlLine(json& line_ini, unsigned short& ordered_list_count) {
+
+            max_char_height_line_px = 0;
+            line_attributes = line_ini["line_attributes"];
+
+
+
+
+            if (line_attributes.contains("list")) {
+
+                std::string type_of_list = line_attributes["list"];
+
+
+                if (type_of_list.compare(std::string("ordered")) == 0) {
+
+
+                    std::string list_ordered = std::to_string(ordered_list_count).append(".");
+
+                    text_fragments.push_back(HprlTextFragment(list_ordered, DEFAULT_CHAR_HEIGHT_PX));
+
+                    ordered_list_count++;
+                }
+
+                if (type_of_list.compare(std::string("bullet")) == 0) {
+
+                    ordered_list_count = 1;
+                    text_fragments.push_back(HprlTextFragment("-", DEFAULT_CHAR_HEIGHT_PX));
+
+                }
+
+
+
+            }
+            else {
+
+                ordered_list_count = 1;
+
+            }
+
+            for (json& x : line_ini["content"]["ops"]) {
+
+                text_fragments.push_back(HprlTextFragment(x));
+
+            }
+
+            for (auto& x : text_fragments) {
+
+                if (x.fragment_height_px > max_char_height_line_px) {
+
+                    max_char_height_line_px = x.fragment_height_px;
+
+                }
+
+            }
+
+
+
+
+        }
+
+        std::vector<HprlTextFragment> text_fragments;
+        json line_attributes;
+        unsigned int max_char_height_line_px;
+
+
+
+    };
+
+    struct HprlText {
+
+    public:
+
+        HprlText(unsigned int width_px_ini, unsigned int height_px_ini, json& lines) {
+
+            width_px = width_px_ini;
+            height_px = height_px_ini;
+            left_margin_px = DEFAULT_LEFT_MARGIN_PX;
+            upper_margin_px = DEFAULT_UPPER_MARGIN;
+
+            for (json& x : lines) {
+
+                lines_vec.push_back(HprlLine(x, ordered_list_counter));
+
+            }
+
+        }
+        HprlText(unsigned int width_px_ini, unsigned int height_px_ini, unsigned int left_margin_px_ini, unsigned int upper_margin_px_ini, std::vector<HprlLine> lines_vec_ini) {
+
+            width_px = width_px_ini;
+            height_px = height_px_ini;
+            left_margin_px = left_margin_px_ini;
+            upper_margin_px = upper_margin_px_ini;
+            lines_vec = lines_vec_ini;
+
+        }
+        HprlText(json& text_descr) {
+
+            std::string width_s = text_descr["dimensions"]["width"];
+            std::string height_s = text_descr["dimensions"]["height"];
+
+            width_px = std::stoul(width_s.substr(0, width_s.size() - 2).c_str());
+            height_px = std::stoul(height_s.substr(0, height_s.size() - 2).c_str());
+            left_margin_px = DEFAULT_LEFT_MARGIN_PX;
+            upper_margin_px = DEFAULT_UPPER_MARGIN;
+
+            for (json& x : text_descr["lines"]) {
+
+                lines_vec.push_back(HprlLine(x, ordered_list_counter));
+
+            }
+
+        }
+
+        unsigned int width_px;
+        unsigned int height_px;
+        unsigned int left_margin_px;
+        unsigned int upper_margin_px;
+        unsigned short ordered_list_counter = 1;
+        std::vector<HprlLine> lines_vec;
+
+    };
+
+
     std::unordered_map<std::string, FontFace> basic_font_faces_map;
+
     std::unordered_map<std::string, FontFace> other_font_faces_map;
+
     LRUTextureCache texture_cache;
 
+    bool getTextureFromCache(std::size_t hash, Texture& dst_texture);
+    
+    unsigned char* createTexture(HprlText& text);
 
     void printTextFragment(HprlTextFragment& frag, unsigned char* work_buffer, unsigned char* single_chan_buf, int tex_w, int tex_h, int& xpos, int& baseline);
 
@@ -923,9 +939,258 @@ private:
 
 };
 
+enum TextModificators {
+
+    bold, italic, underline, strike, 
+
+    align_c, align_r, lst_bul, lst_ord, el
 
 
-#ifdef HPRL_IMPLEMENTATION
+};
+
+struct Color{
+
+    std::string hex_color;
+
+};
+
+class Creator {
+
+
+public:
+
+    friend class FontFamilyManager;
+
+    Creator& operator << (TextModificators attr) {
+
+        switch (attr) {
+        case bold:
+            addBold();
+            break;
+        case italic:
+            addItalic();
+            break;
+        case strike:
+            addStrike();
+            break;
+        case underline:
+            addUnderline();
+            break;
+        case align_r:
+            alignRight();
+            break;
+        case align_c:
+            alignCenter();
+            break;
+        case lst_ord:
+            lstOrdered();
+            break;
+        case lst_bul:
+            lstBullet();
+            break;
+        case el:
+            terminateLine();
+            break;
+
+        default:
+            break;
+
+        }
+
+        return *this;
+    }
+
+    Creator& operator << (std::string content) {
+
+        if (text["lines"].size() == 0) {
+
+            createLine(content);
+
+        }
+        else {
+
+            appendFragment(content);
+        }
+
+        return *this;
+
+    }
+
+    Creator& operator << (unsigned int size_px) {
+
+        addSize(size_px);
+        return *this;
+    }
+
+    Creator& operator << (Color color) {
+
+        addColor(color.hex_color);
+        return *this;
+    }
+
+    Creator(unsigned int width_px, unsigned int height_px){
+    
+        text["lines"] = json::array();
+        text["dimensions"]["width"] = std::to_string(width_px).append("px");;
+        text["dimensions"]["height"] = std::to_string(height_px).append("px");;
+    
+    }
+
+
+private:
+
+    json text;
+
+    std::string current_color = "";
+
+    unsigned int current_size_px = DEFAULT_CHAR_HEIGHT_PX;
+
+    void createLine(std::string content) {
+
+        json line;
+        line["content"]["ops"][0]["insert"] = content;
+        line["line_attributes"] = json::object();
+        text["lines"].push_back(line);
+
+        if (current_size_px != DEFAULT_CHAR_HEIGHT_PX) {
+
+            addSize(current_size_px);
+
+        }
+
+        if (!current_color.empty()) {
+
+            addColor(current_color);
+
+        }
+    }
+
+    void appendFragment(std::string content) {
+        
+        if (!text["lines"].empty()) {
+            json frag;
+            frag["insert"] = content;
+            text["lines"].back()["content"]["ops"].push_back(frag);
+
+            if (current_size_px != DEFAULT_CHAR_HEIGHT_PX) {
+
+                addSize(current_size_px);
+
+            }
+
+            if (!current_color.empty()) {
+
+                addColor(current_color);
+
+            }
+
+        }
+    }
+
+    void terminateLine() {
+
+        json empty_line;
+        empty_line["content"]["ops"] = json::array();
+        empty_line["line_attributes"] = json::object();
+        text["lines"].push_back(empty_line);
+
+    }
+
+    void alignCenter() {
+
+        if (!text["lines"].empty()) {
+            text["lines"].back()["line_attributes"]["align"] = "center";
+        }
+    }
+
+    void alignRight() {
+
+        if (!text["lines"].empty()) {
+            text["lines"].back()["line_attributes"]["align"] = "right";
+        }
+    }
+
+    void lstBullet() {
+        if (!text["lines"].empty()) {
+            text["lines"].back()["line_attributes"]["list"] = "bullet";
+        }
+    }
+
+    void lstOrdered() {
+        if (!text["lines"].empty()) {
+            text["lines"].back()["line_attributes"]["list"] = "ordered";
+        }
+    }
+
+    void addBold() {
+
+        if (!text["lines"].empty()) {
+            if (!text["lines"].back()["content"]["ops"].empty()) {
+
+                text["lines"].back()["content"]["ops"].back()["attributes"]["bold"] = true;
+             }
+        }
+    }
+
+    void addItalic() {
+
+        if (!text["lines"].empty()) {
+            if (!text["lines"].back()["content"]["ops"].empty()) {
+
+                text["lines"].back()["content"]["ops"].back()["attributes"]["italic"] = true;
+            }
+        }
+    }
+
+    void addUnderline() {
+
+        if (!text["lines"].empty()) {
+            if (!text["lines"].back()["content"]["ops"].empty()) {
+
+                text["lines"].back()["content"]["ops"].back()["attributes"]["underline"] = true;
+            }
+        }
+    }
+
+    void addStrike() {
+
+        if (!text["lines"].empty()) {
+            if (!text["lines"].back()["content"]["ops"].empty()) {
+
+                text["lines"].back()["content"]["ops"].back()["attributes"]["strike"] = true;
+            }
+        }
+    }
+
+    void addSize(unsigned int size_px) {
+
+        current_size_px = size_px;
+        
+        if (!text["lines"].empty()) {
+            if (!text["lines"].back()["content"]["ops"].empty()) {
+
+                text["lines"].back()["content"]["ops"].back()["attributes"]["size"] = std::to_string(size_px).append("px");
+            }
+        }
+    }
+
+    void addColor(std::string color) {
+
+        current_color = color;
+
+        if (!text["lines"].empty()) {
+            if (!text["lines"].back()["content"]["ops"].empty()) {
+
+                text["lines"].back()["content"]["ops"].back()["attributes"]["color"] = color;
+            }
+        }
+
+    }
+
+};
+
+
+//#ifdef HPRL_IMPLEMENTATION
 
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
@@ -943,7 +1208,7 @@ private:
 //
 //////////////////////////////////////////////////////////////////////////////
 
-FontFace::FontFace(unsigned char* font_data_ini, char32_t first_char, char32_t char_count, std::vector<float> heights_char_pixel, int offset) {
+FontFamilyManager::FontFace::FontFace(unsigned char* font_data_ini, char32_t first_char, char32_t char_count, std::vector<float> heights_char_pixel, int offset) {
 
     this->font_data = font_data_ini;
     this->first_char_ini = first_char;
@@ -953,13 +1218,11 @@ FontFace::FontFace(unsigned char* font_data_ini, char32_t first_char, char32_t c
     initializeFontFace(first_char, char_count, heights_char_pixel);
 
 }
-RasterizedGlyph& FontFace::getGlyph(char32_t requested_char, float height_char_pixel) {
+FontFamilyManager::RasterizedGlyph& FontFamilyManager::FontFace::getGlyph(char32_t requested_char, float height_char_pixel) {
 
-    //std::cout << "Font instance collection size: " << font_instances_collection.size() << "\n" << std::endl;
+    
 
     if (!font_instances_collection.contains(height_char_pixel)) {
-
-        //std::cout << "Height does not exist\n" << std::endl;
 
         std::vector h{ height_char_pixel };
         initializeFontFace(requested_char, 1, h);
@@ -989,12 +1252,6 @@ RasterizedGlyph& FontFace::getGlyph(char32_t requested_char, float height_char_p
             font_instances_collection.at(height_char_pixel).glyphs[requested_char] = new_glyph;
 
         }
-        else {
-
-            /*std::cout << "Cache hit: " << char(to_uint(requested_char))  << std::endl;
-            std::cout << "Num of glyphs: " << font_instances_collection.at(height_char_pixel).glyphs.size() << std::endl;
-            std::cout << "Font instance collection size: " << font_instances_collection.size() << "\n" << std::endl;*/
-        }
 
     }
 
@@ -1002,7 +1259,7 @@ RasterizedGlyph& FontFace::getGlyph(char32_t requested_char, float height_char_p
     return font_instances_collection.at(height_char_pixel).glyphs[requested_char];
 
 }
-float FontFace::getScaleFactor(float height_char_pixel) {
+float FontFamilyManager::FontFace::getScaleFactor(float height_char_pixel) {
 
     if (font_instances_collection.contains(height_char_pixel)) {
 
@@ -1018,9 +1275,9 @@ float FontFace::getScaleFactor(float height_char_pixel) {
 
     }
 }
-void FontFace::initializeFontFace(char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel) {
+void FontFamilyManager::FontFace::initializeFontFace(char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel) {
 
-
+    
     for (float h : heights_char_pixel) {
 
 
@@ -1066,7 +1323,7 @@ void FontFace::initializeFontFace(char32_t first_char, char32_t char_count, std:
 //
 //////////////////////////////////////////////////////////////////////////////
 
-TextManager::TextManager(BasicFontDescription& basic_ff_descr, char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel, unsigned int cache_capacity) {
+FontFamilyManager::FontFamilyManager(FontFamilyInitializer& basic_ff_descr, char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel, unsigned int cache_capacity) {
 
     if (cache_capacity > 0) {
         texture_cache = LRUTextureCache(cache_capacity);
@@ -1076,15 +1333,8 @@ TextManager::TextManager(BasicFontDescription& basic_ff_descr, char32_t first_ch
         texture_cache = LRUTextureCache();
     }
 
-
-    FontFace bold_face = FontFace(basic_ff_descr.normal->font_data, first_char, char_count, heights_char_pixel, basic_ff_descr.normal->offset);
-    std::cout << "Sto nel text manager" << std::endl;
-
-    bold_face.makeArtificialBold();
-
     basic_font_faces_map.emplace("normal", FontFace(basic_ff_descr.normal->font_data, first_char, char_count, heights_char_pixel, basic_ff_descr.normal->offset));
-    //basic_font_faces_map.emplace("bold", FontFace(basic_ff_descr.bold->font_data, first_char, char_count, heights_char_pixel, basic_ff_descr.bold->offset));
-    basic_font_faces_map.emplace("bold", bold_face);
+    basic_font_faces_map.emplace("bold", FontFace(basic_ff_descr.bold->font_data, first_char, char_count, heights_char_pixel, basic_ff_descr.bold->offset));
     basic_font_faces_map.emplace("italic", FontFace(basic_ff_descr.italic->font_data, first_char, char_count, heights_char_pixel, basic_ff_descr.italic->offset));
     basic_font_faces_map.emplace("bolditalic", FontFace(basic_ff_descr.bolditalic->font_data, first_char, char_count, heights_char_pixel, basic_ff_descr.bolditalic->offset));
 
@@ -1097,7 +1347,7 @@ TextManager::TextManager(BasicFontDescription& basic_ff_descr, char32_t first_ch
 
 }
 
-std::size_t TextManager::parse(std::u8string input, Texture& texture) {
+std::size_t FontFamilyManager::parseFromEditor(std::u8string input, Texture& texture) {
 
     std::size_t h1 = std::hash<std::u8string>{}(input);
 
@@ -1131,7 +1381,7 @@ std::size_t TextManager::parse(std::u8string input, Texture& texture) {
 
     }
 
-bool TextManager::getTextureFromCache(std::size_t hash, Texture& dst_texture) {
+bool FontFamilyManager::getTextureFromCache(std::size_t hash, Texture& dst_texture) {
 
     if (texture_cache.contains(hash)) {
 
@@ -1145,12 +1395,12 @@ bool TextManager::getTextureFromCache(std::size_t hash, Texture& dst_texture) {
 
 }
 
-std::size_t TextManager::getHashFromInputString(std::u8string input) {
+std::size_t FontFamilyManager::getHashFromInputString(std::u8string input) {
 
     return std::hash<std::u8string>{}(input);
 }
 
-unsigned char* TextManager::createTexture(HprlText& text) {
+unsigned char* FontFamilyManager::createTexture(HprlText& text) {
 
 
     int tex_w = text.width_px, tex_h = text.height_px;
@@ -1226,7 +1476,7 @@ unsigned char* TextManager::createTexture(HprlText& text) {
 
 }
 
-void TextManager::printTextFragment(HprlTextFragment& frag, unsigned char* work_buffer, unsigned char* single_chan_buf, int tex_w, int tex_h, int& xpos, int& baseline) {
+void FontFamilyManager::printTextFragment(HprlTextFragment& frag, unsigned char* work_buffer, unsigned char* single_chan_buf, int tex_w, int tex_h, int& xpos, int& baseline) {
 
     json attributes = frag.text_attributes;
     unsigned int height = frag.fragment_height_px;
@@ -1242,7 +1492,7 @@ void TextManager::printTextFragment(HprlTextFragment& frag, unsigned char* work_
 
     if (attributes.contains("color")) {
 
-        color = FontColor::colorConverter(attributes["color"], 1.0f);
+        color = FontColor::cvtColorFromHexToFontColor(attributes["color"], 1.0f);
 
     }
     else {
@@ -1402,7 +1652,7 @@ void TextManager::printTextFragment(HprlTextFragment& frag, unsigned char* work_
 
 }
 
-int TextManager::getLineLength(HprlLine& line) {
+int FontFamilyManager::getLineLength(HprlLine& line) {
 
     int total_length = 0;
 
@@ -1418,7 +1668,7 @@ int TextManager::getLineLength(HprlLine& line) {
 
 }
 
-int TextManager::getFragmentLength(HprlTextFragment& frag) {
+int FontFamilyManager::getFragmentLength(HprlTextFragment& frag) {
 
     json attributes = frag.text_attributes;
     hprl_string content = frag.content;
@@ -1465,7 +1715,7 @@ int TextManager::getFragmentLength(HprlTextFragment& frag) {
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif // !HPRL_IMPLEMANTATION
+//#endif // !HPRL_IMPLEMANTATION
 
 
 #ifdef HPRL_IMAGE_WRITER_IMPLEMENTATION

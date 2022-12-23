@@ -29,39 +29,48 @@ using json = nlohmann::json;
 // 
 
 
+/////////////////////////////////////
+//CREARE TEMPLATE PER GLI ATTRIBUTI
+//UN VETTORE DI ATTRIBUTI BANALMENTE
+/////////////////////////////////////
+
 
 int main() {
 
     SetConsoleOutputCP(65001);
 
     
-    std::u8string in_big = u8R"({"lines":[{"content":{"ops":[{"attributes":{"size":"60px","color":"#e60000"},"insert":"ARTIFICIAL BOLD"},{"attributes":{"size":"60px"},"insert":" "},{"attributes":{"size":"60px","color":"#9933ff"},"insert":"NORMAL"}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"size":"60px","color":"#e60000","bold":true},"insert":"ARTIFICIAL BOLD "},{"attributes":{"size":"60px","color":"#9933ff"},"insert":"YES"}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"size":"60px","color":"#e60000","italic":true},"insert":"ARTIFICIAL BOLD"},{"attributes":{"size":"60px","color":"#e60000"},"insert":" "},{"attributes":{"size":"60px","color":"#9933ff"},"insert":"NOT"}]},"line_attributes":{}}],"dimensions":{"width":"1728px","height":"750px"}})";
+    std::u8string in_big = u8R"({"lines":[{"content":{"ops":[{"attributes":{"size":"60px","color":"#e60000"},"insert":"ARTIFICIAL FUNZIONA"},{"attributes":{"size":"60px"},"insert":" "},{"attributes":{"size":"60px","color":"#9933ff"},"insert":"NORMAL"}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"size":"60px","color":"#e60000","bold":true},"insert":"ARTIFICIAL BOLD "},{"attributes":{"size":"60px","color":"#9933ff"},"insert":"YES"}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"size":"60px","color":"#e60000","italic":true},"insert":"ARTIFICIAL BOLD"},{"attributes":{"size":"60px","color":"#e60000"},"insert":" "},{"attributes":{"size":"60px","color":"#9933ff"},"insert":"NOT"}]},"line_attributes":{}}],"dimensions":{"width":"1728px","height":"750px"}})";
 
-    std::vector<float> myHeights{};
+    std::vector<float> myHeights{20};
 
     FontFaceDescription *f_normal = new FontFaceDescription("c:/windows/fonts/arial.ttf", 0, "NORMAL" );
     FontFaceDescription *f_bold = new FontFaceDescription("c:/windows/fonts/arialbd.ttf", 0, "BOLD");
-    //FontFaceDescription *f_italic = new FontFaceDescription("c:/windows/fonts/ariali.ttf", 0, "ITALIC");
-    FontFaceDescription* f_italic = new FontFaceDescription("c:/windows/fonts/arialbd.ttf", 0, "ITALIC");
+    FontFaceDescription* f_italic = new FontFaceDescription("c:/windows/fonts/ariali.ttf", 0, "ITALIC");
     FontFaceDescription *f_bolditalic = new FontFaceDescription("c:/windows/fonts/arialbi.ttf", 0, "BOLDITALIC");
 
     std::vector<FontFaceDescription> descr{};
 
-    BasicFontDescription bas_descr = BasicFontDescription(f_normal, f_bold, f_italic, f_bolditalic, descr);
-    TextManager tm = TextManager(bas_descr, 32, 95, myHeights, 80);
+    FontFamilyInitializer bas_descr = FontFamilyInitializer(f_normal, f_bold, f_italic, f_bolditalic, descr);
+    FontFamilyManager tm = FontFamilyManager(bas_descr, 32, 95, myHeights, 80);
 
-
-    /*HprlTextFragment x = HprlTextFragment::createTextFragment("Prova").addBoldnessToFragment().addSizePxToFragment(30);
     
-    x.addUnderlineToFragment().addStrikeToFragment();*/
+
+    /*Creator x{ 1000, 1000 };
+
+    x
+      << 30 << Color{"#e60000"}
+      << "Questo è italic" << italic << lst_ord << el 
+      << "Questo è bold underlined" << bold << underline << 40 << Color{ "#e600e6" } << lst_bul << el
+      << "Questa è una lista" << align_c << Color{ "#e600e6" } << lst_ord;*/
 
 
     Texture text;
-    std::size_t hash = tm.parse(in_big, text);
-   
+    std::size_t hash = tm.parseFromEditor(in_big, text);
+  
     auto t1 = Clock::now();
 
-    ImageWriter::createPng("test_ARTIFICIAL.png", text);
+    ImageWriter::createPng("test_con_modifiche.png", text);
 
     auto t2 = Clock::now();
 
