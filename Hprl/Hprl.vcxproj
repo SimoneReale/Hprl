@@ -163,7 +163,6 @@
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="src\default_font.h" />
     <ClInclude Include="src\hprl.h" />
     <ClInclude Include="src\json.hpp" />
     <ClInclude Include="src\stb_image_write.h" />
