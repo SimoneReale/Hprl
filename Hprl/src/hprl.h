@@ -7678,6 +7678,7 @@ unsigned int def_font_regular_len = 91928;
 #include <vector>
 #include <string>
 #include <unordered_map>
+
 #define DEFAULT_CHAR_HEIGHT_PX 18
 #define DEFAULT_LEFT_MARGIN_PX 18
 #define DEFAULT_UPPER_MARGIN   18
@@ -7686,7 +7687,10 @@ unsigned int def_font_regular_len = 91928;
 #define DEFAULT_STARTING_CODEPOINT 32
 #define DEFAULT_NUMBER_OF_CODEPOINTS 95
 
-typedef std::u32string  hprl_string;
+
+typedef std::u32string  hprl_content_string;
+typedef std::u8string   hprl_editor_string;
+typedef std::vector<float> hprl_hgts_px;
 typedef char32_t        hprl_char;
 using json = nlohmann::json;
 
@@ -7695,11 +7699,11 @@ inline unsigned int to_uint(char ch)
 {
     return static_cast<unsigned int>(static_cast<unsigned char>(ch));
 }
-inline hprl_string to_utf32(std::string const& s)
+inline hprl_content_string to_utf32(std::string const& s)
 {
     std::wstring_convert<std::codecvt<char32_t, char, std::mbstate_t>, char32_t > convert;
     auto asInt = convert.from_bytes(s);
-    return hprl_string(reinterpret_cast<char32_t const*>(asInt.data()), asInt.length());
+    return hprl_content_string(reinterpret_cast<char32_t const*>(asInt.data()), asInt.length());
 }
 
 unsigned char* grayscale_dilation(unsigned char* in, unsigned int in_width, unsigned int in_height, int kernel_size) {
@@ -7782,9 +7786,9 @@ unsigned char* shear(unsigned char* in, unsigned int in_width, unsigned int in_h
 }
 
 
-class Texture {
+struct Texture {
 
-public:
+
     unsigned char* texture;
     unsigned int width;
     unsigned int height;
@@ -7822,7 +7826,6 @@ public:
         return *dst;
 
     }
-
 
 
 private:
@@ -8155,21 +8158,274 @@ struct FontFamilyInitializer {
            
 };
 
+enum TextModificators {
+
+    bold, italic, underline, strike, 
+
+    align_c, align_r, lst_bul, lst_ord, el
+
+
+};
+
+struct Color{
+
+    std::string hex_color;
+
+};
+
+class TextCreator {
+
+
+public:
+
+    friend class FontFamilyManager;
+
+    TextCreator& operator << (TextModificators attr) {
+
+        switch (attr) {
+        case bold:
+            addBold();
+            break;
+        case italic:
+            addItalic();
+            break;
+        case strike:
+            addStrike();
+            break;
+        case underline:
+            addUnderline();
+            break;
+        case align_r:
+            alignRight();
+            break;
+        case align_c:
+            alignCenter();
+            break;
+        case lst_ord:
+            lstOrdered();
+            break;
+        case lst_bul:
+            lstBullet();
+            break;
+        case el:
+            terminateLine();
+            break;
+
+        default:
+            break;
+
+        }
+
+        return *this;
+    }
+
+    TextCreator& operator << (std::string content) {
+
+        if (text["lines"].size() == 0) {
+
+            createLine(content);
+
+        }
+        else {
+
+            appendFragment(content);
+        }
+
+        return *this;
+
+    }
+
+    TextCreator& operator << (unsigned int size_px) {
+
+        addSize(size_px);
+        return *this;
+    }
+
+    TextCreator& operator << (Color color) {
+
+        addColor(color.hex_color);
+        return *this;
+    }
+
+    TextCreator(unsigned int width_px, unsigned int height_px){
+    
+        text["lines"] = json::array();
+        text["dimensions"]["width"] = std::to_string(width_px).append("px");;
+        text["dimensions"]["height"] = std::to_string(height_px).append("px");;
+    
+    }
+
+
+private:
+
+    json text;
+
+    std::string current_color = "";
+
+    unsigned int current_size_px = DEFAULT_CHAR_HEIGHT_PX;
+
+    void createLine(std::string content) {
+
+        json line;
+        line["content"]["ops"][0]["insert"] = content;
+        line["line_attributes"] = json::object();
+        text["lines"].push_back(line);
+
+        if (current_size_px != DEFAULT_CHAR_HEIGHT_PX) {
+
+            addSize(current_size_px);
+
+        }
+
+        if (!current_color.empty()) {
+
+            addColor(current_color);
+
+        }
+    }
+
+    void appendFragment(std::string content) {
+        
+        if (!text["lines"].empty()) {
+            json frag;
+            frag["insert"] = content;
+            text["lines"].back()["content"]["ops"].push_back(frag);
+
+            if (current_size_px != DEFAULT_CHAR_HEIGHT_PX) {
+
+                addSize(current_size_px);
+
+            }
+
+            if (!current_color.empty()) {
+
+                addColor(current_color);
+
+            }
+
+        }
+    }
+
+    void terminateLine() {
+
+        json empty_line;
+        empty_line["content"]["ops"] = json::array();
+        empty_line["line_attributes"] = json::object();
+        text["lines"].push_back(empty_line);
+
+    }
+
+    void alignCenter() {
+
+        if (!text["lines"].empty()) {
+            text["lines"].back()["line_attributes"]["align"] = "center";
+        }
+    }
+
+    void alignRight() {
+
+        if (!text["lines"].empty()) {
+            text["lines"].back()["line_attributes"]["align"] = "right";
+        }
+    }
+
+    void lstBullet() {
+        if (!text["lines"].empty()) {
+            text["lines"].back()["line_attributes"]["list"] = "bullet";
+        }
+    }
+
+    void lstOrdered() {
+        if (!text["lines"].empty()) {
+            text["lines"].back()["line_attributes"]["list"] = "ordered";
+        }
+    }
+
+    void addBold() {
+
+        if (!text["lines"].empty()) {
+            if (!text["lines"].back()["content"]["ops"].empty()) {
+
+                text["lines"].back()["content"]["ops"].back()["attributes"]["bold"] = true;
+             }
+        }
+    }
+
+    void addItalic() {
+
+        if (!text["lines"].empty()) {
+            if (!text["lines"].back()["content"]["ops"].empty()) {
+
+                text["lines"].back()["content"]["ops"].back()["attributes"]["italic"] = true;
+            }
+        }
+    }
+
+    void addUnderline() {
+
+        if (!text["lines"].empty()) {
+            if (!text["lines"].back()["content"]["ops"].empty()) {
+
+                text["lines"].back()["content"]["ops"].back()["attributes"]["underline"] = true;
+            }
+        }
+    }
+
+    void addStrike() {
+
+        if (!text["lines"].empty()) {
+            if (!text["lines"].back()["content"]["ops"].empty()) {
+
+                text["lines"].back()["content"]["ops"].back()["attributes"]["strike"] = true;
+            }
+        }
+    }
+
+    void addSize(unsigned int size_px) {
+
+        current_size_px = size_px;
+        
+        if (!text["lines"].empty()) {
+            if (!text["lines"].back()["content"]["ops"].empty()) {
+
+                text["lines"].back()["content"]["ops"].back()["attributes"]["size"] = std::to_string(size_px).append("px");
+            }
+        }
+    }
+
+    void addColor(std::string color) {
+
+        current_color = color;
+
+        if (!text["lines"].empty()) {
+            if (!text["lines"].back()["content"]["ops"].empty()) {
+
+                text["lines"].back()["content"]["ops"].back()["attributes"]["color"] = color;
+            }
+        }
+
+    }
+
+};
+
 class FontFamilyManager {
 
 public:
             
-    FontFamilyManager(FontFamilyInitializer& basic_ff_descr, char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel, unsigned int cache_capacity);
+    FontFamilyManager(FontFamilyInitializer& basic_ff_descr, char32_t first_char, char32_t char_count, std::vector<float> heights_char_pixel, unsigned int cache_capacity);
 
     #ifdef HPRL_DEFAULT_FONT
-    FontFamilyManager(std::vector<float>& heights_char_pixel, unsigned int cache_capacity);
+    FontFamilyManager(std::vector<float> heights_char_pixel, unsigned int cache_capacity);
     #endif
 
     FontFamilyManager() = delete;
 
     std::size_t parseFromEditor(std::u8string input, Texture& texture);
 
-    std::size_t getHashFromInputString(std::u8string input);
+    std::size_t getCreatorTexture(TextCreator& creator, Texture& texture);
+
+    std::size_t getHash(std::u8string input);
+    std::size_t getHash(json input);
 
 
 
@@ -8468,7 +8724,7 @@ private:
         }*/
 
 
-        hprl_string content;
+        hprl_content_string content;
         json text_attributes;
         std::string content_utf8;
         unsigned int fragment_height_px;
@@ -8614,261 +8870,13 @@ private:
 
     void printTextFragment(HprlTextFragment& frag, unsigned char* work_buffer, unsigned char* single_chan_buf, int tex_w, int tex_h, int& xpos, int& baseline);
 
-    int getLineLength(HprlLine& line);
+    unsigned int getLineLength(HprlLine& line);
 
-    int getFragmentLength(HprlTextFragment& frag);
-
-};
-
-enum TextModificators {
-
-    bold, italic, underline, strike, 
-
-    align_c, align_r, lst_bul, lst_ord, el
-
+    unsigned int getFragmentLength(HprlTextFragment& frag);
 
 };
 
-struct Color{
 
-    std::string hex_color;
-
-};
-
-class TextCreator {
-
-
-public:
-
-    friend class FontFamilyManager;
-
-    TextCreator& operator << (TextModificators attr) {
-
-        switch (attr) {
-        case bold:
-            addBold();
-            break;
-        case italic:
-            addItalic();
-            break;
-        case strike:
-            addStrike();
-            break;
-        case underline:
-            addUnderline();
-            break;
-        case align_r:
-            alignRight();
-            break;
-        case align_c:
-            alignCenter();
-            break;
-        case lst_ord:
-            lstOrdered();
-            break;
-        case lst_bul:
-            lstBullet();
-            break;
-        case el:
-            terminateLine();
-            break;
-
-        default:
-            break;
-
-        }
-
-        return *this;
-    }
-
-    TextCreator& operator << (std::string content) {
-
-        if (text["lines"].size() == 0) {
-
-            createLine(content);
-
-        }
-        else {
-
-            appendFragment(content);
-        }
-
-        return *this;
-
-    }
-
-    TextCreator& operator << (unsigned int size_px) {
-
-        addSize(size_px);
-        return *this;
-    }
-
-    TextCreator& operator << (Color color) {
-
-        addColor(color.hex_color);
-        return *this;
-    }
-
-    TextCreator(unsigned int width_px, unsigned int height_px){
-    
-        text["lines"] = json::array();
-        text["dimensions"]["width"] = std::to_string(width_px).append("px");;
-        text["dimensions"]["height"] = std::to_string(height_px).append("px");;
-    
-    }
-
-
-private:
-
-    json text;
-
-    std::string current_color = "";
-
-    unsigned int current_size_px = DEFAULT_CHAR_HEIGHT_PX;
-
-    void createLine(std::string content) {
-
-        json line;
-        line["content"]["ops"][0]["insert"] = content;
-        line["line_attributes"] = json::object();
-        text["lines"].push_back(line);
-
-        if (current_size_px != DEFAULT_CHAR_HEIGHT_PX) {
-
-            addSize(current_size_px);
-
-        }
-
-        if (!current_color.empty()) {
-
-            addColor(current_color);
-
-        }
-    }
-
-    void appendFragment(std::string content) {
-        
-        if (!text["lines"].empty()) {
-            json frag;
-            frag["insert"] = content;
-            text["lines"].back()["content"]["ops"].push_back(frag);
-
-            if (current_size_px != DEFAULT_CHAR_HEIGHT_PX) {
-
-                addSize(current_size_px);
-
-            }
-
-            if (!current_color.empty()) {
-
-                addColor(current_color);
-
-            }
-
-        }
-    }
-
-    void terminateLine() {
-
-        json empty_line;
-        empty_line["content"]["ops"] = json::array();
-        empty_line["line_attributes"] = json::object();
-        text["lines"].push_back(empty_line);
-
-    }
-
-    void alignCenter() {
-
-        if (!text["lines"].empty()) {
-            text["lines"].back()["line_attributes"]["align"] = "center";
-        }
-    }
-
-    void alignRight() {
-
-        if (!text["lines"].empty()) {
-            text["lines"].back()["line_attributes"]["align"] = "right";
-        }
-    }
-
-    void lstBullet() {
-        if (!text["lines"].empty()) {
-            text["lines"].back()["line_attributes"]["list"] = "bullet";
-        }
-    }
-
-    void lstOrdered() {
-        if (!text["lines"].empty()) {
-            text["lines"].back()["line_attributes"]["list"] = "ordered";
-        }
-    }
-
-    void addBold() {
-
-        if (!text["lines"].empty()) {
-            if (!text["lines"].back()["content"]["ops"].empty()) {
-
-                text["lines"].back()["content"]["ops"].back()["attributes"]["bold"] = true;
-             }
-        }
-    }
-
-    void addItalic() {
-
-        if (!text["lines"].empty()) {
-            if (!text["lines"].back()["content"]["ops"].empty()) {
-
-                text["lines"].back()["content"]["ops"].back()["attributes"]["italic"] = true;
-            }
-        }
-    }
-
-    void addUnderline() {
-
-        if (!text["lines"].empty()) {
-            if (!text["lines"].back()["content"]["ops"].empty()) {
-
-                text["lines"].back()["content"]["ops"].back()["attributes"]["underline"] = true;
-            }
-        }
-    }
-
-    void addStrike() {
-
-        if (!text["lines"].empty()) {
-            if (!text["lines"].back()["content"]["ops"].empty()) {
-
-                text["lines"].back()["content"]["ops"].back()["attributes"]["strike"] = true;
-            }
-        }
-    }
-
-    void addSize(unsigned int size_px) {
-
-        current_size_px = size_px;
-        
-        if (!text["lines"].empty()) {
-            if (!text["lines"].back()["content"]["ops"].empty()) {
-
-                text["lines"].back()["content"]["ops"].back()["attributes"]["size"] = std::to_string(size_px).append("px");
-            }
-        }
-    }
-
-    void addColor(std::string color) {
-
-        current_color = color;
-
-        if (!text["lines"].empty()) {
-            if (!text["lines"].back()["content"]["ops"].empty()) {
-
-                text["lines"].back()["content"]["ops"].back()["attributes"]["color"] = color;
-            }
-        }
-
-    }
-
-};
 
 
 //#ifdef HPRL_IMPLEMENTATION
@@ -9004,7 +9012,7 @@ void FontFamilyManager::FontFace::initializeFontFace(char32_t first_char, char32
 //
 //////////////////////////////////////////////////////////////////////////////
 
-FontFamilyManager::FontFamilyManager(FontFamilyInitializer& basic_ff_descr, char32_t first_char, char32_t char_count, std::vector<float>& heights_char_pixel, unsigned int cache_capacity) {
+FontFamilyManager::FontFamilyManager(FontFamilyInitializer& basic_ff_descr, char32_t first_char, char32_t char_count, std::vector<float> heights_char_pixel, unsigned int cache_capacity) {
 
     if (cache_capacity > 0) {
         texture_cache = LRUTextureCache(cache_capacity);
@@ -9029,7 +9037,7 @@ FontFamilyManager::FontFamilyManager(FontFamilyInitializer& basic_ff_descr, char
 }
 
 #ifdef HPRL_DEFAULT_FONT
-FontFamilyManager::FontFamilyManager(std::vector<float>& heights_char_pixel, unsigned int cache_capacity){
+FontFamilyManager::FontFamilyManager(std::vector<float> heights_char_pixel, unsigned int cache_capacity){
 
     if (cache_capacity > 0) {
         texture_cache = LRUTextureCache(cache_capacity);
@@ -9098,9 +9106,18 @@ bool FontFamilyManager::getTextureFromCache(std::size_t hash, Texture& dst_textu
 
 }
 
-std::size_t FontFamilyManager::getHashFromInputString(std::u8string input) {
+std::size_t FontFamilyManager::getHash(std::u8string input) {
 
-    return std::hash<std::u8string>{}(input);
+    json in = json::parse(input);
+    return std::hash<json>{}(in);
+
+}
+
+std::size_t FontFamilyManager::getHash(json input) {
+
+    
+    return std::hash<json>{}(input);
+
 }
 
 unsigned char* FontFamilyManager::createTexture(HprlText& text) {
@@ -9179,6 +9196,39 @@ unsigned char* FontFamilyManager::createTexture(HprlText& text) {
 
 }
 
+std::size_t FontFamilyManager::getCreatorTexture(TextCreator& creator, Texture& texture) {
+
+    std::size_t h1 = getHash(creator.text);
+
+    if (!texture_cache.contains(h1)) {
+
+        json text_descr = creator.text;
+
+        json lines = text_descr["lines"];
+        json dimensions = text_descr["dimensions"];
+
+        std::string width_s = dimensions["width"];
+        std::string height_s = dimensions["height"];
+
+        if (width_s.size() <= 2 || height_s.size() <= 2) {
+
+            throw std::runtime_error("BAD DIMENSIONS IN PARSED STRING");
+
+        }
+
+        //strip px
+        unsigned int width = std::stoul(width_s.substr(0, width_s.size() - 2).c_str());
+        unsigned int height = std::stoul(height_s.substr(0, height_s.size() - 2).c_str());
+        HprlText newText = HprlText(width, height, lines);
+        texture_cache.emplace(h1, Texture{ createTexture(newText) , width, height });
+    }
+
+    texture_cache.at(h1, texture);
+
+    return h1;
+
+}
+
 void FontFamilyManager::printTextFragment(HprlTextFragment& frag, unsigned char* work_buffer, unsigned char* single_chan_buf, int tex_w, int tex_h, int& xpos, int& baseline) {
 
     json attributes = frag.text_attributes;
@@ -9242,7 +9292,7 @@ void FontFamilyManager::printTextFragment(HprlTextFragment& frag, unsigned char*
 
 
     int ch = 0;
-    hprl_string text = frag.content;
+    hprl_content_string text = frag.content;
 
     float scale_factor = work_font_face.getScaleFactor(height);
 
@@ -9355,7 +9405,7 @@ void FontFamilyManager::printTextFragment(HprlTextFragment& frag, unsigned char*
 
 }
 
-int FontFamilyManager::getLineLength(HprlLine& line) {
+unsigned int FontFamilyManager::getLineLength(HprlLine& line) {
 
     int total_length = 0;
 
@@ -9371,10 +9421,10 @@ int FontFamilyManager::getLineLength(HprlLine& line) {
 
 }
 
-int FontFamilyManager::getFragmentLength(HprlTextFragment& frag) {
+unsigned int FontFamilyManager::getFragmentLength(HprlTextFragment& frag) {
 
     json attributes = frag.text_attributes;
-    hprl_string content = frag.content;
+    hprl_content_string content = frag.content;
     unsigned int height_px = frag.fragment_height_px;
 
     FontFace work_font_face = basic_font_faces_map.at("normal");
