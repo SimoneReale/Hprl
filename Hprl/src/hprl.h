@@ -8869,6 +8869,8 @@ private:
     unsigned char* createTexture(HprlText& text);
 
     void printTextFragment(HprlTextFragment& frag, unsigned char* work_buffer, unsigned char* single_chan_buf, int tex_w, int tex_h, int& xpos, int& baseline);
+    
+    void printSingleCharacter(unsigned int c, FontColor color, FontFace work_font_face, unsigned char* work_buffer, unsigned char* single_chan_buf, unsigned int height, int& xpos, int& baseline, int tex_w, int tex_h, float scale_factor);
 
     unsigned int getLineLength(HprlLine& line);
 
@@ -9401,6 +9403,83 @@ void FontFamilyManager::printTextFragment(HprlTextFragment& frag, unsigned char*
             }
         }
     }
+
+
+}
+
+void FontFamilyManager::printSingleCharacter(unsigned int c, FontColor color, FontFace work_font_face, unsigned char* work_buffer, unsigned char* single_chan_buf, unsigned int height, int& xpos, int& baseline, int tex_w, int tex_h, float scale_factor) {
+
+    RasterizedGlyph& glyph = work_font_face.getGlyph(c, height);
+
+    int advance = glyph.advance;
+    int lsb = glyph.lsb;
+    int x0 = glyph.x0, y0 = glyph.y0, x1 = glyph.x1, y1 = glyph.y1;
+
+    unsigned char* temp_buffer = glyph.bitmap;
+
+
+
+    for (int j = y0; j < y1; j++) {
+        for (int i = x0; i < x1; i++) {
+
+            if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] != 0 && temp_buffer[(j - y0) * (x1 - x0) + (i - x0)] == 0) {
+            }
+            else {
+
+                single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] = temp_buffer[(j - y0) * (x1 - x0) + (i - x0)];
+            }
+        }
+    }
+
+    for (int j = y0; j < y1; j++) {
+        for (int i = x0; i < x1; i++) {
+
+            if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] == 0) {
+
+
+                //red
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = 255;
+                //green
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = 255;
+                //blue
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = 255;
+                //alpha
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = 255;
+
+
+            }
+
+
+            if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] > 0 && single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] < 255) {
+                //red
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = unsigned char(color.r * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                //green
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = unsigned char(color.g * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                //blue
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = unsigned char(color.b * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                //alpha
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)];
+            }
+
+            else {
+
+                //red
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = unsigned char(color.r * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                //green
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = unsigned char(color.g * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                //blue
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = unsigned char(color.b * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                //alpha
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = unsigned char(color.alpha * 255);
+
+            }
+
+
+        }
+
+    }
+
+    xpos += (advance * scale_factor);
 
 
 }

@@ -36,11 +36,9 @@ int main() {
 
     hprl_editor_string in_big = u8R"({"lines":[{"content":{"ops":[{"attributes":{"size":"40px","bold":true},"insert":"Giovanni"},{"attributes":{"size":"40px"},"insert":" è "},{"attributes":{"underline":true,"size":"40px","color":"#e60000","italic":true},"insert":"simpatico"}]},"line_attributes":{}},{"content":{"ops":[{"attributes":{"size":"40px","color":"#9933ff","strike":true},"insert":"Giulia"},{"attributes":{"size":"40px"},"insert":" "},{"attributes":{"italic":true,"size":"40px","bold":true},"insert":"anche"}]},"line_attributes":{"align":"center"}}],"dimensions":{"width":"400px","height":"400px"}})";
 
+
     FontFamilyManager tm = FontFamilyManager(hprl_hgts_px({ 40 }), 80);
-
     TextCreator x{ 1000, 1000 };
-
-
     x
       << 30 << Color{"#e60000"}
       << "Questo è italic" << italic << lst_ord << el 
@@ -48,18 +46,20 @@ int main() {
       << "Questa è una lista" << align_c << Color{ "#e600e6" } << lst_ord;
 
 
-    Texture text_parse;
-    tm.parseFromEditor(in_big, text_parse);
-
     Texture text_created;
     tm.getCreatorTexture(x, text_created);
   
+
+
     auto t1 = Clock::now();
 
     //ImageWriter::createPng("test_from_editor.png", text_parse);
     //ImageWriter::createPng("test_from_creator.png", text_created);
 
     auto t2 = Clock::now();
+
+    Texture text_parse;
+    tm.parseFromEditor(in_big, text_parse);
 
 
     /*FontFaceDescription *f_normal = new FontFaceDescription("c:/windows/fonts/arial.ttf", 0, "NORMAL" );
