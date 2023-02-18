@@ -8173,14 +8173,14 @@ struct Color{
 
 };
 
-class TextCreator {
+class FixedTextCreator {
 
 
 public:
 
     friend class FontFamilyManager;
 
-    TextCreator& operator << (TextModificators attr) {
+    FixedTextCreator& operator << (TextModificators attr) {
 
         switch (attr) {
         case bold:
@@ -8219,7 +8219,7 @@ public:
         return *this;
     }
 
-    TextCreator& operator << (std::string content) {
+    FixedTextCreator& operator << (std::string content) {
 
         if (text["lines"].size() == 0) {
 
@@ -8235,23 +8235,29 @@ public:
 
     }
 
-    TextCreator& operator << (unsigned int size_px) {
+    FixedTextCreator& operator << (unsigned int size_px) {
 
         addSize(size_px);
         return *this;
     }
 
-    TextCreator& operator << (Color color) {
+    FixedTextCreator& operator << (Color color) {
 
         addColor(color.hex_color);
         return *this;
     }
 
-    TextCreator(unsigned int width_px, unsigned int height_px){
+    FixedTextCreator(unsigned int width_px, unsigned int height_px, unsigned int left_margin_px_ini, unsigned int right_margin_px_ini, unsigned int upper_margin_px_ini){
     
         text["lines"] = json::array();
-        text["dimensions"]["width"] = std::to_string(width_px).append("px");;
-        text["dimensions"]["height"] = std::to_string(height_px).append("px");;
+        text["dimensions"]["width"] = std::to_string(width_px).append("px");
+        text["dimensions"]["height"] = std::to_string(height_px).append("px");
+
+        current_size_px = DEFAULT_CHAR_HEIGHT_PX;
+        current_color = "";
+        left_margin_px = left_margin_px_ini;
+        right_margin_px = right_margin_px_ini;
+        upper_margin_px = upper_margin_px_ini;
     
     }
 
@@ -8260,9 +8266,16 @@ private:
 
     json text;
 
-    std::string current_color = "";
+    unsigned int upper_margin_px;
+    
+    unsigned int left_margin_px;
 
-    unsigned int current_size_px = DEFAULT_CHAR_HEIGHT_PX;
+    unsigned int right_margin_px;
+
+    unsigned int current_size_px;
+
+    std::string current_color;
+
 
     void createLine(std::string content) {
 
@@ -8273,13 +8286,13 @@ private:
 
         if (current_size_px != DEFAULT_CHAR_HEIGHT_PX) {
 
-            addSize(current_size_px);
+            text["lines"].back()["content"]["ops"].back()["attributes"]["size"] = std::to_string(current_size_px).append("px");
 
         }
 
         if (!current_color.empty()) {
 
-            addColor(current_color);
+            text["lines"].back()["content"]["ops"].back()["attributes"]["color"] = current_color;
 
         }
     }
@@ -8293,13 +8306,14 @@ private:
 
             if (current_size_px != DEFAULT_CHAR_HEIGHT_PX) {
 
-                addSize(current_size_px);
-
+                
+                text["lines"].back()["content"]["ops"].back()["attributes"]["size"] = std::to_string(current_size_px).append("px");
+                
             }
 
             if (!current_color.empty()) {
 
-                addColor(current_color);
+                        text["lines"].back()["content"]["ops"].back()["attributes"]["color"] = current_color;
 
             }
 
@@ -8385,24 +8399,12 @@ private:
 
         current_size_px = size_px;
         
-        if (!text["lines"].empty()) {
-            if (!text["lines"].back()["content"]["ops"].empty()) {
-
-                text["lines"].back()["content"]["ops"].back()["attributes"]["size"] = std::to_string(size_px).append("px");
-            }
-        }
+        
     }
 
     void addColor(std::string color) {
 
         current_color = color;
-
-        if (!text["lines"].empty()) {
-            if (!text["lines"].back()["content"]["ops"].empty()) {
-
-                text["lines"].back()["content"]["ops"].back()["attributes"]["color"] = color;
-            }
-        }
 
     }
 
@@ -8411,7 +8413,9 @@ private:
 class FontFamilyManager {
 
 public:
-            
+    
+    friend class TextEditor;
+
     FontFamilyManager(FontFamilyInitializer& basic_ff_descr, char32_t first_char, char32_t char_count, std::vector<float> heights_char_pixel, unsigned int cache_capacity);
 
     #ifdef HPRL_DEFAULT_FONT
@@ -8420,11 +8424,12 @@ public:
 
     FontFamilyManager() = delete;
 
-    std::size_t parseFromEditor(std::u8string input, Texture& texture);
+    std::size_t parseFromEditor(std::u8string input, Texture& texture, unsigned int left_margin_px, unsigned int right_margin_px, unsigned int upper_margin_px);
 
-    std::size_t getCreatorTexture(TextCreator& creator, Texture& texture);
+    std::size_t getCreatorTexture(FixedTextCreator& creator, Texture& texture);
 
     std::size_t getHash(std::u8string input);
+
     std::size_t getHash(json input);
 
 
@@ -8684,7 +8689,7 @@ private:
         }
 
 
-        /*HprlTextFragment& addSizePxToFragment(unsigned int size_px) {
+        HprlTextFragment& addSizePxToFragment(unsigned int size_px) {
 
             text_attributes["size"] = std::to_string(size_px).append("px");
             fragment_height_px = size_px;
@@ -8717,11 +8722,11 @@ private:
             return *this;
         }
 
-        HprlTextFragment& addItalicToFragment(HprlTextFragment& frag) {
+        HprlTextFragment& addItalicToFragment() {
 
             text_attributes["italic"] = true;
             return *this;
-        }*/
+        }
 
 
         hprl_content_string content;
@@ -8866,15 +8871,269 @@ private:
 
     bool getTextureFromCache(std::size_t hash, Texture& dst_texture);
     
-    unsigned char* createTexture(HprlText& text);
+    unsigned char* createTexture(HprlText& text, unsigned int left_margin_px, unsigned int right_margin_px, unsigned int upper_margin_px);
 
     void printTextFragment(HprlTextFragment& frag, unsigned char* work_buffer, unsigned char* single_chan_buf, int tex_w, int tex_h, int& xpos, int& baseline);
+
+    void deleteTextFragment(HprlTextFragment& frag, unsigned char* work_buffer, unsigned char* single_chan_buf, int tex_w, int tex_h, int& xpos, int& baseline);
     
-    void printSingleCharacter(unsigned int c, FontColor color, FontFace work_font_face, unsigned char* work_buffer, unsigned char* single_chan_buf, unsigned int height, int& xpos, int& baseline, int tex_w, int tex_h, float scale_factor);
+    void printSingleCharacter(unsigned int c, FontColor& color, FontFace& work_font_face, unsigned char* work_buffer, unsigned char* single_chan_buf, unsigned int& height, int& xpos, int& baseline, int& tex_w, int& tex_h, float& scale_factor);
+
+    void deleteSingleCharacter(unsigned int c, FontFace& work_font_face, unsigned char* work_buffer, unsigned char* single_chan_buf, unsigned int& height, int& xpos, int& baseline, int& tex_w, int& tex_h, float& scale_factor);
 
     unsigned int getLineLength(HprlLine& line);
 
     unsigned int getFragmentLength(HprlTextFragment& frag);
+
+};
+
+struct FragmentPos {
+
+    int baseline;
+    int initial_xpos;
+    int end_xpos;
+
+    bool operator()(const FragmentPos& a, const FragmentPos& b) const {
+
+        if (a.baseline < b.baseline) {
+
+            return true;
+        }
+        else if (a.baseline > b.baseline) {
+
+            return false;
+        }
+        else {
+
+            if (a.initial_xpos < b.initial_xpos) {
+
+                return true;
+            }
+            else {
+
+                return false;
+            }
+
+
+        }
+
+    }
+
+};
+
+class TextEditor {
+
+public:
+
+    TextEditor() = delete;
+
+    TextEditor(FontFamilyManager& fm_ini, unsigned int buffer_w_ini, unsigned int buffer_h_ini, float char_height_ini) : fm(fm_ini) {
+
+        buffer_w = buffer_w_ini;
+        buffer_h = buffer_h_ini;
+        char_height = char_height_ini;
+        left_margin_px = 0;
+        right_margin_px = 0;
+        upper_margin_px = 0;
+        xpos = 0;
+        std::string ini = "";
+
+        work_buffer = new unsigned char[buffer_h * buffer_w * 4];
+        single_chan_buff = new unsigned char[buffer_h * buffer_w];
+        
+
+        for (int i = 0; i < buffer_h * buffer_w; i++) {
+
+            work_buffer[i * 4] = 0;
+            work_buffer[i * 4 + 1] = 0;
+            work_buffer[i * 4 + 2] = 0;
+            work_buffer[i * 4 + 3] = 0;
+
+        }
+
+        for (int i = 0; i < buffer_h * buffer_w; i++) {
+
+            single_chan_buff[i] = 1;
+
+        }
+
+        ascent = fm.basic_font_faces_map.at("normal").ascent;
+        descent = fm.basic_font_faces_map.at("normal").descent;
+        line_gap = fm.basic_font_faces_map.at("normal").line_gap;
+
+
+        baseline = (int)(fm.basic_font_faces_map.at("normal").ascent * fm.basic_font_faces_map.at("normal").getScaleFactor(char_height_ini));
+
+
+
+    };
+
+    TextEditor(FontFamilyManager& fm_ini, unsigned int buffer_w_ini, unsigned int buffer_h_ini, float char_height_ini, unsigned int left_margin_px_ini, unsigned int right_margin_px_ini, unsigned int upper_margin_px_ini) : fm(fm_ini) {
+
+        buffer_w = buffer_w_ini;
+        buffer_h = buffer_h_ini;
+        char_height = char_height_ini;
+        left_margin_px = left_margin_px_ini;
+        right_margin_px = right_margin_px_ini;
+        upper_margin_px = upper_margin_px_ini;
+        xpos = left_margin_px;
+        std::string ini = "";
+
+        work_buffer = new unsigned char[buffer_h * buffer_w * 4];
+        single_chan_buff = new unsigned char[buffer_h * buffer_w];
+
+
+        for (int i = 0; i < buffer_h * buffer_w; i++) {
+
+            work_buffer[i * 4] = 0;
+            work_buffer[i * 4 + 1] = 0;
+            work_buffer[i * 4 + 2] = 0;
+            work_buffer[i * 4 + 3] = 0;
+
+        }
+
+        for (int i = 0; i < buffer_h * buffer_w; i++) {
+
+            single_chan_buff[i] = 1;
+
+        }
+
+        ascent = fm.basic_font_faces_map.at("normal").ascent;
+        descent = fm.basic_font_faces_map.at("normal").descent;
+        line_gap = fm.basic_font_faces_map.at("normal").line_gap;
+
+
+        baseline = (int)(fm.basic_font_faces_map.at("normal").ascent * fm.basic_font_faces_map.at("normal").getScaleFactor(char_height_ini)) + upper_margin_px;
+
+
+
+    };
+
+    unsigned char* appendFragment(std::string content) {
+
+        FontFamilyManager::HprlTextFragment current_char_frag = FontFamilyManager::HprlTextFragment::createTextFragment(content);
+
+        if (italic) current_char_frag.addItalicToFragment();
+        if (bold) current_char_frag.addBoldnessToFragment();
+        if (underlined) current_char_frag.addUnderlineToFragment();
+        if (striked) current_char_frag.addUnderlineToFragment();
+        if (!color_hex_value.empty()) current_char_frag.addColorToFragment(color_hex_value);
+        
+
+        current_char_frag.addSizePxToFragment(char_height);
+
+        if (xpos + fm.getFragmentLength(current_char_frag) > buffer_w - right_margin_px) {
+
+            xpos = left_margin_px;
+            baseline += (ascent - descent + line_gap) * fm.basic_font_faces_map.at("normal").getScaleFactor(char_height);
+
+        }
+
+        int initial_xpos = xpos;
+
+        fm.printTextFragment(current_char_frag, work_buffer, single_chan_buff, buffer_w, buffer_h, xpos, baseline);
+
+        frag_map.insert(std::pair(FragmentPos{ baseline, initial_xpos, xpos }, current_char_frag));
+
+
+        //std::cout << "Sono nella append frag " << frag_map.at(FragmentPos{baseline, initial_xpos, xpos}).content_utf8 << " " << baseline << " Initial xpos " << initial_xpos << " End xpos " << xpos << std::endl;
+
+        return work_buffer;
+
+    }
+
+    unsigned char* deleteLastFragment() {
+
+
+
+
+
+
+    }
+
+
+    
+    unsigned char* addNewLine() {
+
+        xpos = left_margin_px;
+        baseline += (ascent - descent + line_gap) * fm.basic_font_faces_map.at("normal").getScaleFactor(char_height);
+        return work_buffer;
+
+    }
+
+    void ManageBold(bool is_active) {
+
+        bold = is_active;
+    }
+
+    void ManageItalic(bool is_active) {
+
+        italic = is_active;
+    }
+
+    void ManageStrike(bool is_active) {
+
+        striked = is_active;
+    }
+
+    void ManageUnderlined(bool is_active) {
+
+        underlined = is_active;
+    }
+
+    void ManageColor(std::string hex_color) {
+
+        color_hex_value = hex_color;
+    }
+
+    void changeFontFamily(FontFamilyManager& new_fm) {
+
+        fm = new_fm;
+
+        ascent = fm.basic_font_faces_map.at("normal").ascent;
+        descent = fm.basic_font_faces_map.at("normal").descent;
+        line_gap = fm.basic_font_faces_map.at("normal").line_gap;
+
+    }
+
+    void changeSizePx(unsigned int size_px) {
+
+        char_height = size_px;
+
+    }
+
+private:
+
+    FontFamilyManager& fm;
+
+    std::map<FragmentPos, FontFamilyManager::HprlTextFragment, FragmentPos> frag_map;
+
+    unsigned int buffer_w;
+    unsigned int buffer_h;
+
+    unsigned char* work_buffer;
+    unsigned char* single_chan_buff;
+
+    int xpos;
+    int baseline;
+
+    int ascent;
+    int descent;
+    int line_gap;
+
+    unsigned int left_margin_px;
+    unsigned int right_margin_px;
+    unsigned int upper_margin_px;
+
+    float char_height;
+    std::string color_hex_value = "";
+
+
+    bool italic = false;
+    bool bold = false;
+    bool underlined = false;
+    bool striked = false;
+
 
 };
 
@@ -9060,7 +9319,7 @@ FontFamilyManager::FontFamilyManager(std::vector<float> heights_char_pixel, unsi
 #endif
 
 
-std::size_t FontFamilyManager::parseFromEditor(std::u8string input, Texture& texture) {
+std::size_t FontFamilyManager::parseFromEditor(std::u8string input, Texture& texture, unsigned int left_margin_px, unsigned int right_margin_px, unsigned int upper_margin_px) {
 
     std::size_t h1 = std::hash<std::u8string>{}(input);
 
@@ -9085,7 +9344,7 @@ std::size_t FontFamilyManager::parseFromEditor(std::u8string input, Texture& tex
         unsigned int width = std::stoul(width_s.substr(0, width_s.size() - 2).c_str());
         unsigned int height = std::stoul(height_s.substr(0, height_s.size() - 2).c_str());
         HprlText newText = HprlText(width, height, lines);
-        texture_cache.emplace(h1, Texture{ createTexture(newText) , width, height });
+        texture_cache.emplace(h1, Texture{ createTexture(newText, left_margin_px, right_margin_px, upper_margin_px) , width, height });
 }
 
     texture_cache.at(h1, texture);
@@ -9122,13 +9381,13 @@ std::size_t FontFamilyManager::getHash(json input) {
 
 }
 
-unsigned char* FontFamilyManager::createTexture(HprlText& text) {
+unsigned char* FontFamilyManager::createTexture(HprlText& text, unsigned int left_margin_px, unsigned int right_margin_px, unsigned int upper_margin_px) {
 
 
     int tex_w = text.width_px, tex_h = text.height_px;
     unsigned char* work_buffer = new unsigned char[tex_h * tex_w * 4];
     unsigned char* single_channel_buff = new unsigned char[tex_h * tex_w];
-    int center_x_texture = ceil(tex_w / 2);
+    int center_x_texture = ceil((tex_w + left_margin_px - right_margin_px) / 2);
 
     for (int i = 0; i < tex_w * tex_h; i++) {
 
@@ -9150,22 +9409,18 @@ unsigned char* FontFamilyManager::createTexture(HprlText& text) {
     int line_gap = basic_font_faces_map.at("normal").line_gap;
 
     float max_height_ini = text.lines_vec[0].max_char_height_line_px;
-    int baseline = (int)(basic_font_faces_map.at("normal").ascent * basic_font_faces_map.at("normal").getScaleFactor(max_height_ini));
+    int baseline = (int)(basic_font_faces_map.at("normal").ascent * basic_font_faces_map.at("normal").getScaleFactor(max_height_ini)) + upper_margin_px;
 
 
+    int xpos = left_margin_px;
 
     for (int i = 0; i < text.lines_vec.size(); i++) {
 
-
         json line_attributes = text.lines_vec[i].line_attributes;
-        int xpos = 0;
-
-
 
         if (line_attributes.contains("align")) {
 
             std::string alignment = line_attributes["align"];
-
 
 
             if (alignment.compare(std::string("center")) == 0) {
@@ -9175,12 +9430,11 @@ unsigned char* FontFamilyManager::createTexture(HprlText& text) {
 
             if (alignment.compare(std::string("right")) == 0) {
 
-                xpos = tex_w - getLineLength(text.lines_vec[i]);
+                xpos = tex_w - right_margin_px - getLineLength(text.lines_vec[i]);
             }
 
 
         }
-
 
 
         for (HprlTextFragment frag : text.lines_vec[i].text_fragments) {
@@ -9188,17 +9442,19 @@ unsigned char* FontFamilyManager::createTexture(HprlText& text) {
             printTextFragment(frag, work_buffer, single_channel_buff, tex_w, tex_h, xpos, baseline);
         }
 
-        if (i < text.lines_vec.size() - 1) {
+        if (i < text.lines_vec.size() - 1 && !text.lines_vec[i + 1].text_fragments.empty()) {
             int max_height = text.lines_vec[i + 1].max_char_height_line_px;
             baseline += (ascent - descent + line_gap) * basic_font_faces_map.at("normal").getScaleFactor(max_height);
+            xpos = left_margin_px;
         }
     }
+    
 
     return work_buffer;
 
 }
 
-std::size_t FontFamilyManager::getCreatorTexture(TextCreator& creator, Texture& texture) {
+std::size_t FontFamilyManager::getCreatorTexture(FixedTextCreator& creator, Texture& texture) {
 
     std::size_t h1 = getHash(creator.text);
 
@@ -9222,7 +9478,7 @@ std::size_t FontFamilyManager::getCreatorTexture(TextCreator& creator, Texture& 
         unsigned int width = std::stoul(width_s.substr(0, width_s.size() - 2).c_str());
         unsigned int height = std::stoul(height_s.substr(0, height_s.size() - 2).c_str());
         HprlText newText = HprlText(width, height, lines);
-        texture_cache.emplace(h1, Texture{ createTexture(newText) , width, height });
+        texture_cache.emplace(h1, Texture{ createTexture(newText, creator.left_margin_px, creator.right_margin_px, creator.upper_margin_px) , width, height });
     }
 
     texture_cache.at(h1, texture);
@@ -9300,79 +9556,11 @@ void FontFamilyManager::printTextFragment(HprlTextFragment& frag, unsigned char*
 
 
     while (to_uint(text[ch])) {
+
+        
+
         unsigned int c = to_uint(text[ch]);
-
-        RasterizedGlyph& glyph = work_font_face.getGlyph(c, height);
-
-        int advance = glyph.advance;
-        int lsb = glyph.lsb;
-        int x0 = glyph.x0, y0 = glyph.y0, x1 = glyph.x1, y1 = glyph.y1;
-
-        unsigned char* temp_buffer = glyph.bitmap;
-
-
-
-        for (int j = y0; j < y1; j++) {
-            for (int i = x0; i < x1; i++) {
-
-                if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] != 0 && temp_buffer[(j - y0) * (x1 - x0) + (i - x0)] == 0) {
-                }
-                else {
-
-                    single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] = temp_buffer[(j - y0) * (x1 - x0) + (i - x0)];
-                }
-            }
-        }
-
-        for (int j = y0; j < y1; j++) {
-            for (int i = x0; i < x1; i++) {
-
-                if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] == 0) {
-
-
-                    //red
-                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = 255;
-                    //green
-                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = 255;
-                    //blue
-                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = 255;
-                    //alpha
-                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = 255;
-
-
-                }
-
-
-                if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] > 0 && single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] < 255) {
-                    //red
-                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = unsigned char(color.r * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
-                    //green
-                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = unsigned char(color.g * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
-                    //blue
-                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = unsigned char(color.b * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
-                    //alpha
-                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)];
-                }
-
-                else {
-
-                    //red
-                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = unsigned char(color.r * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
-                    //green
-                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = unsigned char(color.g * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
-                    //blue
-                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = unsigned char(color.b * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
-                    //alpha
-                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = unsigned char(color.alpha * 255);
-
-                }
-
-
-            }
-
-        }
-
-        xpos += (advance * scale_factor);
+        printSingleCharacter(c, color, work_font_face, work_buffer, single_chan_buf, height, xpos, baseline, tex_w, tex_h, scale_factor);
 
         ++ch;
     }
@@ -9407,7 +9595,92 @@ void FontFamilyManager::printTextFragment(HprlTextFragment& frag, unsigned char*
 
 }
 
-void FontFamilyManager::printSingleCharacter(unsigned int c, FontColor color, FontFace work_font_face, unsigned char* work_buffer, unsigned char* single_chan_buf, unsigned int height, int& xpos, int& baseline, int tex_w, int tex_h, float scale_factor) {
+void FontFamilyManager::deleteTextFragment(HprlTextFragment& frag, unsigned char* work_buffer, unsigned char* single_chan_buf, int tex_w, int tex_h, int& xpos, int& baseline) {
+
+    json attributes = frag.text_attributes;
+    unsigned int height = frag.fragment_height_px;
+
+    int initial_xpos = xpos;
+    int strike_height = baseline - int(height / 3);
+    int underline_height = baseline + int(height / 10);
+    int thickness_of_line = ceil(height / 10);
+
+
+    FontFace work_font_face = basic_font_faces_map.at("normal");
+
+    if (!attributes.contains("bold") && !attributes.contains("italic")) {
+
+        work_font_face = basic_font_faces_map.at("normal");
+
+    }
+
+
+    if (attributes.contains("bold") && attributes.contains("italic")) {
+
+        work_font_face = basic_font_faces_map.at("bolditalic");
+
+    }
+
+    if (attributes.contains("bold") && !attributes.contains("italic")) {
+
+
+        work_font_face = basic_font_faces_map.at("bold");
+
+
+
+    }
+
+    if (!attributes.contains("bold") && attributes.contains("italic")) {
+
+        work_font_face = basic_font_faces_map.at("italic");
+
+    }
+
+
+
+    hprl_content_string text = frag.content;
+    
+
+    float scale_factor = work_font_face.getScaleFactor(height);
+
+
+    for (int x = text.length() - 1; x >= 0; x--) {
+
+        deleteSingleCharacter(to_uint(text[x]), work_font_face, work_buffer, single_chan_buf, height, xpos, baseline, tex_w, tex_h, scale_factor);
+
+    }
+
+    if (attributes.contains("strike")) {
+        for (int y = strike_height; y < strike_height + thickness_of_line; y++) {
+            for (int x = xpos; x < initial_xpos; x++) {
+
+                work_buffer[y * tex_w * 4 + x * 4 + 0] = 0;
+                work_buffer[y * tex_w * 4 + x * 4 + 1] = 0;
+                work_buffer[y * tex_w * 4 + x * 4 + 2] = 0;
+                work_buffer[y * tex_w * 4 + x * 4 + 3] = 0;
+
+            }
+        }
+    }
+
+
+    if (attributes.contains("underline")) {
+        for (int y = underline_height; y < underline_height + thickness_of_line; y++) {
+            for (int x = xpos; x < initial_xpos; x++) {
+
+                work_buffer[y * tex_w * 4 + x * 4 + 0] = 0;
+                work_buffer[y * tex_w * 4 + x * 4 + 1] = 0;
+                work_buffer[y * tex_w * 4 + x * 4 + 2] = 0;
+                work_buffer[y * tex_w * 4 + x * 4 + 3] = 0;
+
+            }
+        }
+    }
+
+
+}
+
+void FontFamilyManager::printSingleCharacter(unsigned int c, FontColor &color, FontFace &work_font_face, unsigned char* work_buffer, unsigned char* single_chan_buf, unsigned int &height, int& xpos, int& baseline, int &tex_w, int &tex_h, float &scale_factor) {
 
     RasterizedGlyph& glyph = work_font_face.getGlyph(c, height);
 
@@ -9433,21 +9706,6 @@ void FontFamilyManager::printSingleCharacter(unsigned int c, FontColor color, Fo
 
     for (int j = y0; j < y1; j++) {
         for (int i = x0; i < x1; i++) {
-
-            if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] == 0) {
-
-
-                //red
-                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = 255;
-                //green
-                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = 255;
-                //blue
-                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = 255;
-                //alpha
-                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = 255;
-
-
-            }
 
 
             if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] > 0 && single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] < 255) {
@@ -9479,10 +9737,74 @@ void FontFamilyManager::printSingleCharacter(unsigned int c, FontColor color, Fo
 
     }
 
-    xpos += (advance * scale_factor);
+    
+    xpos += int((advance * scale_factor));
 
 
 }
+
+void FontFamilyManager::deleteSingleCharacter(unsigned int c, FontFace& work_font_face, unsigned char* work_buffer, unsigned char* single_chan_buf, unsigned int& height, int& xpos, int& baseline, int& tex_w, int& tex_h, float& scale_factor) {
+
+    RasterizedGlyph& glyph = work_font_face.getGlyph(c, height);
+
+    int advance = glyph.advance;
+    int lsb = glyph.lsb;
+    int x0 = glyph.x0, y0 = glyph.y0, x1 = glyph.x1, y1 = glyph.y1;
+
+    unsigned char* temp_buffer = glyph.bitmap;
+
+    //torno indietro con la xpos
+    xpos -= int((advance * scale_factor));
+
+
+    for (int j = y0; j < y1; j++) {
+        for (int i = x0; i < x1; i++) {
+
+            if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] != 0 && temp_buffer[(j - y0) * (x1 - x0) + (i - x0)] == 0) {
+            }
+            else {
+
+                single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] = 1;
+            }
+        }
+    }
+
+    for (int j = y0; j < y1; j++) {
+        for (int i = x0; i < x1; i++) {
+
+
+            if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] > 0 && single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] < 255) {
+                //red
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = 0;
+                //green
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = 0;
+                //blue
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = 0;
+                //alpha
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = 0;
+            }
+
+            else {
+
+                //red
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = 0;
+                //green
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = 0;
+                //blue
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = 0;
+                //alpha
+                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = 0;
+
+            }
+
+
+        }
+
+    }
+
+
+}
+
 
 unsigned int FontFamilyManager::getLineLength(HprlLine& line) {
 
