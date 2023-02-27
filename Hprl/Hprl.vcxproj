@@ -165,6 +165,7 @@
   <ItemGroup>
     <ClInclude Include="src\hprl.h" />
     <ClInclude Include="src\json.hpp" />
+    <ClInclude Include="src\stb_image.h" />
     <ClInclude Include="src\stb_image_write.h" />
     <ClInclude Include="src\stb_truetype.h" />
   </ItemGroup>

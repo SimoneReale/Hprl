@@ -2,6 +2,8 @@
 #define HPRL_IMPLEMENTATION
 #define HPRL_DEFAULT_FONT
 #include "hprl.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 #include <chrono>
 #include <cstdio>
 #include <windows.h>
@@ -52,7 +54,6 @@ int main() {
     FontFamily tm_complex = fff.addComplexFontFamily(id_complex, bas_descr, 32, 95, hprl_hgts_px({ 40 }), 80);
 
 
-
     FontFaceDescription* f_normal2 = new FontFaceDescription("c:/windows/fonts/arial.ttf", 0, "NORMAL");
     FontFaceDescription* f_bold2 = new FontFaceDescription("c:/windows/fonts/arialbd.ttf", 0, "BOLD");
     FontFaceDescription* f_italic2 = new FontFaceDescription("c:/windows/fonts/ariali.ttf", 0, "ITALIC");
@@ -61,55 +62,114 @@ int main() {
     FontFamilyInitializer bas_descr2 = FontFamilyInitializer(f_normal2, f_bold2, f_italic2, f_bolditalic2, descr2);
 
 
-
     int id_complex2;
     FontFamily tm_complex2 = fff.addComplexFontFamily(id_complex2, bas_descr2, 32, 95, hprl_hgts_px({ 40 }), 80);
 
 
-
-
-    FixedTextCreator x{ 1000, 1000, 200, 100, 0};
+    FixedTextCreator x{ 1280, 1490, 200, 100, 0};
     x
         << 40 << Color{"#ee00ee"} << "Saponetto" << bold << underline << " bitalic " << italic << Color{"#00ee00"} << "c" << strike << "drusilla" << underline << strike << el;
 
 
 
-    TextEditor te = TextEditor(fff,id_complex2, 1000, 1000, 100, 0, 0, 0);
+    TextEditor te = TextEditor(fff,id_complex2, 1280, 1490, 80, 200, 0, 300);
     Texture tex_ed;
 
-    te.ManageColor("#00ee00");
-    te.ManageBold(true);
-    te.appendFragment("Rocket Speed:", tex_ed);
+    te.ManageColor("#000000");
+    FragmentDescriptor fd5 = te.appendFragment("La prima riga normale", tex_ed);
     te.addNewLine();
-    FragmentDescriptor fd = te.appendFragment("100", tex_ed);
-    te.appendFragment(" km/h", tex_ed);
+    te.ManageColor("#ee0000");
+    te.appendFragment("Il razzo va a:", tex_ed);
+    te.addNewLine();
+    FragmentDescriptor fd = te.appendFragment("100 ", tex_ed);
+    te.appendFragment("km/h", tex_ed);
+    FragmentDescriptor fd3 = te.appendFragment(" fast", tex_ed);
+    te.appendFragment(" pupula", tex_ed);
     auto t1 = Clock::now();
-    te.deleteFragment(fd, tex_ed);
-    te.ManageUnderlined(true);
-    te.printFragmentAt(fd, "900", tex_ed);
+    te.ManageColor("#00ee00");
     auto t2 = Clock::now();
-    te.ManageUnderlined(false);
     te.changeFontFamily(id_complex);
-    te.ManageItalic(false);
     te.addNewLine();
     te.appendFragment("The altitude is: ", tex_ed);
     te.ManageColor("#ee0000");
-    te.appendFragment("stable", tex_ed);
+    te.appendFragment("иащ", tex_ed);
     te.ManageColor("#00ee00");
     te.addNewLine();
     te.appendFragment("Oxygen level: ", tex_ed);
     te.ManageColor("#ee0000");
     FragmentDescriptor fd2 = te.appendFragment("critic", tex_ed);
+    FragmentDescriptor fd4 = te.printFragmentAt(788, 684, "Diletta leotta", tex_ed);
+    te.substituteFragment(fd5, "Olio bollente", tex_ed);
+    te.substituteFragment(fd3, "Seppiolina seppiolona ", tex_ed);
+
+    //te.printMap();
     
-    
-  
+    //int width;
+    //int height;
+    //int n;
+    //unsigned char* data = stbi_load("C:/sr/lp.png", &width, &height, &n, 0);
+
+    //std::cout << "\nEcco " << n << " w: " << width << " h: " << height << std::endl;
+
+    //unsigned char alpha_new = 0;
+    //int index = 0;
+    //for (int j = 0; j < height; j++) {
+    //    for (int i = 0; i < width; i++) {
+
+    //        index = j * width * 4 + i * 4 + 0;
+
+    //        //alpha_new = tex_ed.texture[index + 3] + data[index + 3] * (1 - tex_ed.texture[index + 3]);
+
+    //        //if (alpha_new != 0) {
+
+    //        //    //red
+    //        //    new_image[index] = (data[index] * data[index + 3] + tex_ed.texture[index] * tex_ed.texture[index + 3] * (1 - data[index + 3])) / alpha_new;
+    //        //    //green
+    //        //    new_image[index + 1] = (data[index + 1] * data[index + 3] + tex_ed.texture[index + 1] * tex_ed.texture[index + 3] * (1 - data[index + 3])) / alpha_new;
+    //        //    //blue
+    //        //    new_image[index + 2] = (data[index + 2] * data[index + 3] + tex_ed.texture[index + 2] * tex_ed.texture[index + 3] * (1 - data[index + 3])) / alpha_new;
+    //        //    //alpha
+    //        //    new_image[index + 3] = alpha_new;
+
+    //        //}
+    //        //else {
+
+    //        //    //red
+    //        //    new_image[index] = 0;
+    //        //    //green
+    //        //    new_image[index + 1] = 0;
+    //        //    //blue
+    //        //    new_image[index + 2] = 0;
+    //        //    //alpha
+    //        //    new_image[index + 3] = 0;
+    //        //}
 
 
+
+    //        if (tex_ed.texture[index + 3] != 0) {
+
+    //            data[index] = tex_ed.texture[index];
+    //            data[index + 1] = tex_ed.texture[index + 1];
+    //            data[index + 2] = tex_ed.texture[index + 2];
+    //            data[index + 3] = tex_ed.texture[index + 3];
+
+    //        }
+
+    //    }
+    //}
+    //
+
+
+
+    //Texture tex_new = Texture(data, width, height);
+
+    
 
     //ImageWriter::createPng("test_from_editor.png", text_parse);
     //ImageWriter::createPng("test_from_creator_default.png", text_created_default);
     //ImageWriter::createPng("test_from_creator_complex.png", text_created_complex);
-    ImageWriter::createPng("test_from_editor.png", tex_ed);
+    ImageWriter::createPng("test_from_editor_1.png", tex_ed);
+    //ImageWriter::createJpg("test.jpg", tex_ed, 100);
 
 
     /*Texture text_parse;

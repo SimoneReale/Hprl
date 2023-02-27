@@ -8977,52 +8977,6 @@ public:
 
     TextEditor() = delete;
 
-    TextEditor(FontFamilyManager& ffm_ini, int id_font_family, unsigned int buffer_w_ini, unsigned int buffer_h_ini, float char_height_ini) : ffm(ffm_ini) {
-
-        buffer_w = buffer_w_ini;
-        buffer_h = buffer_h_ini;
-        char_height = char_height_ini;
-        left_margin_px = 0;
-        right_margin_px = 0;
-        upper_margin_px = 0;
-        current_id_font_family = id_font_family;
-        xpos = 0;
-        std::string ini = "";
-
-        work_buffer = new unsigned char[buffer_h * buffer_w * 4];
-        single_chan_buff = new unsigned char[buffer_h * buffer_w];
-        
-
-        for (int i = 0; i < buffer_h * buffer_w; i++) {
-
-            work_buffer[i * 4] = 0;
-            work_buffer[i * 4 + 1] = 0;
-            work_buffer[i * 4 + 2] = 0;
-            work_buffer[i * 4 + 3] = 0;
-
-        }
-
-        for (int i = 0; i < buffer_h * buffer_w; i++) {
-
-            single_chan_buff[i] = 1;
-
-        }
-
-
-
-        FontFamily& current_fm = ffm.getFontFamily(current_id_font_family);
-
-        ascent = current_fm.basic_font_faces_map.at("normal").ascent;
-        descent = current_fm.basic_font_faces_map.at("normal").descent;
-        line_gap = current_fm.basic_font_faces_map.at("normal").line_gap;
-
-
-        baseline = (int)(current_fm.basic_font_faces_map.at("normal").ascent * current_fm.basic_font_faces_map.at("normal").getScaleFactor(char_height_ini));
-
-
-
-    };
-
     TextEditor(FontFamilyManager& ffm_ini, int id_font_family, unsigned int buffer_w_ini, unsigned int buffer_h_ini, float char_height_ini, unsigned int left_margin_px_ini, unsigned int right_margin_px_ini, unsigned int upper_margin_px_ini) : ffm(ffm_ini) {
 
         buffer_w = buffer_w_ini;
@@ -9032,7 +8986,7 @@ public:
         right_margin_px = right_margin_px_ini;
         upper_margin_px = upper_margin_px_ini;
         current_id_font_family = id_font_family;
-        xpos = left_margin_px;
+        last_xpos = left_margin_px;
         std::string ini = "";
 
         work_buffer = new unsigned char[buffer_h * buffer_w * 4];
@@ -9063,7 +9017,7 @@ public:
         line_gap = current_fm.basic_font_faces_map.at("normal").line_gap;
 
 
-        baseline = (int)(current_fm.basic_font_faces_map.at("normal").ascent * current_fm.basic_font_faces_map.at("normal").getScaleFactor(char_height_ini)) + upper_margin_px;
+        last_baseline = (int)(current_fm.basic_font_faces_map.at("normal").ascent * current_fm.basic_font_faces_map.at("normal").getScaleFactor(char_height_ini)) + upper_margin_px;
 
 
 
@@ -9085,18 +9039,17 @@ public:
 
         FontFamily& current_fm = ffm.getFontFamily(current_id_font_family);
 
-        if (xpos + current_fm.getFragmentLength(current_char_frag) > buffer_w - right_margin_px) {
+        if (last_xpos + current_fm.getFragmentLength(current_char_frag) > buffer_w - right_margin_px) {
 
-            xpos = left_margin_px;
-            baseline += (ascent - descent + line_gap) * current_fm.basic_font_faces_map.at("normal").getScaleFactor(char_height);
+            addNewLine();
 
         }
 
-        int initial_xpos = xpos;
+        int initial_xpos = last_xpos;
 
-        current_fm.printTextFragment(current_char_frag, work_buffer, single_chan_buff, buffer_w, buffer_h, xpos, baseline);
+        current_fm.printTextFragment(current_char_frag, work_buffer, single_chan_buff, buffer_w, buffer_h, last_xpos, last_baseline);
 
-        FragmentDescriptor fd = FragmentDescriptor(baseline, initial_xpos, xpos, current_id_font_family);
+        FragmentDescriptor fd = FragmentDescriptor(last_baseline, initial_xpos, last_xpos, current_id_font_family);
 
         frag_map.emplace(fd, current_char_frag);
 
@@ -9106,13 +9059,11 @@ public:
 
     }
 
-
     FragmentDescriptor printFragmentAt(FragmentDescriptor& fd, std::string content, Texture& texture_out) {
-
 
         int initial_xpos = fd.initial_xpos;
         int changing_xpos = initial_xpos;
-        int baseline = fd.baseline;
+        int changing_baseline = fd.baseline;
 
 
         if (frag_map.contains(fd)) {
@@ -9133,14 +9084,17 @@ public:
 
         current_char_frag.addSizePxToFragment(char_height);
 
-
         FontFamily& current_fm = ffm.getFontFamily(current_id_font_family);
 
-        current_fm.printTextFragment(current_char_frag, work_buffer, single_chan_buff, buffer_w, buffer_h, changing_xpos, baseline);
+        current_fm.printTextFragment(current_char_frag, work_buffer, single_chan_buff, buffer_w, buffer_h, changing_xpos, changing_baseline);
 
-        
+        FragmentDescriptor fd_new = FragmentDescriptor(changing_baseline, initial_xpos, changing_xpos, current_id_font_family);
 
-        FragmentDescriptor fd_new = FragmentDescriptor(baseline, initial_xpos, changing_xpos, current_id_font_family);
+        if (changing_xpos > last_xpos && changing_baseline == last_baseline || changing_baseline > last_baseline) {
+
+            last_xpos = changing_xpos;
+            last_baseline = changing_baseline;
+        }
 
         frag_map.emplace(fd_new, current_char_frag);
 
@@ -9150,26 +9104,178 @@ public:
 
 
     }
-    
-    unsigned char* addNewLine() {
 
-        xpos = left_margin_px;
+    FragmentDescriptor printFragmentAt(int ini_baseline, int ini_xpos, std::string content, Texture& texture_out){
+
+
+        int initial_xpos = ini_xpos;
+        int changing_xpos = initial_xpos;
+
+
+        FontFamily::HprlTextFragment current_char_frag = FontFamily::HprlTextFragment::createTextFragment(content);
+
+        if (italic) current_char_frag.addItalicToFragment();
+        if (bold) current_char_frag.addBoldnessToFragment();
+        if (underlined) current_char_frag.addUnderlineToFragment();
+        if (striked) current_char_frag.addStrikeToFragment();
+        if (!color_hex_value.empty()) current_char_frag.addColorToFragment(color_hex_value);
+
+        current_char_frag.addSizePxToFragment(char_height);
+
         FontFamily& current_fm = ffm.getFontFamily(current_id_font_family);
-        baseline += (ascent - descent + line_gap) * current_fm.basic_font_faces_map.at("normal").getScaleFactor(char_height);
-        return work_buffer;
 
+        current_fm.printTextFragment(current_char_frag, work_buffer, single_chan_buff, buffer_w, buffer_h, changing_xpos, last_baseline);
+
+        FragmentDescriptor fd_new = FragmentDescriptor(last_baseline, initial_xpos, changing_xpos, current_id_font_family);
+
+        frag_map.emplace(fd_new, current_char_frag);
+
+        if (changing_xpos > last_xpos && ini_baseline == last_baseline || ini_baseline >= last_baseline) {
+
+            last_xpos = changing_xpos;
+            last_baseline = ini_baseline;
+        }
+
+        texture_out = Texture(work_buffer, buffer_w, buffer_h);
+
+        return fd_new;
+    
     }
-   
-    bool deleteFragment(FragmentDescriptor& frag_descr, Texture& texture_out) {
+
+    FragmentDescriptor substituteFragment(FragmentDescriptor& frag_descr, std::string content, Texture& texture_out) {
+
 
         if (frag_map.contains(frag_descr)) {
 
+            int current_xpos = frag_descr.initial_xpos;
+            int initial_baseline = frag_descr.baseline;
 
-            FontFamily::HprlTextFragment frag = frag_map.at(frag_descr);
+
+            FontFamily::HprlTextFragment& frag = frag_map.at(frag_descr);
+            FontFamily& ff_frag = ffm.getFontFamily(frag_descr.font_family_id);
+            ff_frag.deleteTextFragment(frag, work_buffer, single_chan_buff, buffer_w, buffer_h, frag_descr.end_xpos, frag_descr.baseline);
+            std::vector<FragmentDescriptor> successors = findSuccessorsOneTheSameLine(frag_descr);
+            frag_map.erase(frag_descr);
+
+            
+
+            for (FragmentDescriptor fd : successors) {
+
+                FontFamily::HprlTextFragment& frag_delete = frag_map.at(fd);
+                FontFamily& ff_frag_delete = ffm.getFontFamily(fd.font_family_id);
+                ff_frag_delete.deleteTextFragment(frag_delete, work_buffer, single_chan_buff, buffer_w, buffer_h, fd.end_xpos, fd.baseline);
+
+            }
+
+            FontFamily::HprlTextFragment current_char_frag = FontFamily::HprlTextFragment::createTextFragment(content);
+
+            
+            if (italic) current_char_frag.addItalicToFragment();
+            if (bold) current_char_frag.addBoldnessToFragment();
+            if (underlined) current_char_frag.addUnderlineToFragment();
+            if (striked) current_char_frag.addStrikeToFragment();
+            if (!color_hex_value.empty()) current_char_frag.addColorToFragment(color_hex_value);
+
+            current_char_frag.addSizePxToFragment(char_height);
+
+            FontFamily& current_fm = ffm.getFontFamily(current_id_font_family);
+
+            current_fm.printTextFragment(current_char_frag, work_buffer, single_chan_buff, buffer_w, buffer_h, current_xpos, initial_baseline);
+
+            FragmentDescriptor fd_new = FragmentDescriptor(initial_baseline, frag_descr.initial_xpos, current_xpos, current_id_font_family);
+
+            frag_map.emplace(fd_new, current_char_frag);
+
+
+            for (FragmentDescriptor fd : successors) {
+
+
+                int frag_initial_xpos = current_xpos;
+
+                FontFamily::HprlTextFragment& succ_frag = frag_map.at(fd);
+                FontFamily& succ_ff_frag = ffm.getFontFamily(fd.font_family_id);
+
+                if (frag_initial_xpos + succ_ff_frag.getFragmentLength(current_char_frag) > buffer_w - right_margin_px) {
+
+                    
+                    int new_space = (ascent - descent + line_gap) * succ_ff_frag.basic_font_faces_map.at("normal").getScaleFactor(succ_frag.fragment_height_px);
+                    frag_initial_xpos = left_margin_px;
+                    current_xpos = left_margin_px;
+                    initial_baseline += new_space;
+
+                    changeSpaceBetweenLines(fd, new_space);
+
+                }
+
+                succ_ff_frag.printTextFragment(succ_frag, work_buffer, single_chan_buff, buffer_w, buffer_h, current_xpos, initial_baseline);
+
+                if (current_xpos > last_xpos && initial_baseline == last_baseline || initial_baseline >= last_baseline) {
+
+                    last_xpos = current_xpos;
+                    last_baseline = initial_baseline;
+                }
+
+                FragmentDescriptor new_fd = FragmentDescriptor(initial_baseline, frag_initial_xpos, current_xpos, fd.font_family_id);
+
+                frag_map.emplace(new_fd, succ_frag);
+                frag_map.erase(fd);
+
+            }
+
+
+        }
+        else {
+
+            return frag_descr;
+
+        }
+
+
+
+
+    }
+
+    bool deleteFragmentWithLayoutAdjustment(FragmentDescriptor& frag_descr, Texture& texture_out) {
+
+        if (frag_map.contains(frag_descr)) {
+
+            int current_xpos = frag_descr.initial_xpos;
+            int initial_baseline = frag_descr.baseline;
+
+
+            FontFamily::HprlTextFragment& frag = frag_map.at(frag_descr);
 
             FontFamily& ff_frag = ffm.getFontFamily(frag_descr.font_family_id);
 
+            std::vector<FragmentDescriptor> successors = findSuccessorsOneTheSameLine(frag_descr);
+
             ff_frag.deleteTextFragment(frag, work_buffer, single_chan_buff, buffer_w, buffer_h, frag_descr.end_xpos, frag_descr.baseline);
+
+            frag_map.erase(frag_descr);
+
+            std::cout << successors.size() << std::endl;
+
+
+
+            for (FragmentDescriptor fd : successors) {
+
+                int frag_initial_xpos = current_xpos;
+
+                FontFamily::HprlTextFragment& succ_frag = frag_map.at(fd);
+                FontFamily& succ_ff_frag = ffm.getFontFamily(fd.font_family_id);
+
+
+                succ_ff_frag.deleteTextFragment(succ_frag, work_buffer, single_chan_buff, buffer_w, buffer_h, fd.end_xpos, fd.baseline);
+
+
+                succ_ff_frag.printTextFragment(succ_frag, work_buffer, single_chan_buff, buffer_w, buffer_h, current_xpos, initial_baseline);
+
+                FragmentDescriptor new_fd = FragmentDescriptor(initial_baseline, frag_initial_xpos, current_xpos, fd.font_family_id);
+
+                frag_map.emplace(new_fd, succ_frag);
+                frag_map.erase(fd);
+            }
+
 
             texture_out = Texture(work_buffer, buffer_w, buffer_h);
 
@@ -9187,6 +9293,132 @@ public:
 
     }
 
+    bool deleteFragmentNoLayoutAdjustment(FragmentDescriptor& frag_descr, Texture& texture_out) {
+
+        if (frag_map.contains(frag_descr)) {
+
+            int current_xpos = frag_descr.initial_xpos;
+            int initial_baseline = frag_descr.baseline;
+
+            FontFamily::HprlTextFragment& frag = frag_map.at(frag_descr);
+
+            FontFamily& ff_frag = ffm.getFontFamily(frag_descr.font_family_id);
+
+            ff_frag.deleteTextFragment(frag, work_buffer, single_chan_buff, buffer_w, buffer_h, frag_descr.end_xpos, frag_descr.baseline);
+
+            frag_map.erase(frag_descr);
+
+            texture_out = Texture(work_buffer, buffer_w, buffer_h);
+
+            return true;
+        }
+
+        else {
+
+            return false;
+
+        }
+
+
+
+
+    }
+
+
+    void changeSpaceBetweenLines(FragmentDescriptor& fd, int space_px) {
+
+
+        std::vector<FragmentDescriptor> successors = findAllSuccessors(fd);
+
+        std::cout << "Baseline: " << fd.baseline << " Ini xpos: " << fd.initial_xpos << std::endl;
+
+        printMap();
+
+        std::vector<FontFamily::HprlTextFragment> successors_frag;
+
+        for (FragmentDescriptor& fd_delete : successors) {
+        
+            successors_frag.push_back(frag_map.at(fd_delete));
+            internalDeleteFragmentNoLayoutAdjustment(fd_delete);
+        
+        }
+
+
+        for (int i = 0; i < successors.size(); i++) {
+
+
+            int changing_xpos = successors[i].initial_xpos;
+            int frag_baseline = successors[i].baseline + space_px;
+            int frag_family_id = successors[i].font_family_id;
+
+            std::cout << "Content: " << successors_frag[i].content_utf8 << " Xpos: " << changing_xpos << " Baseline old: " << successors[i].baseline << " Baseline new: " << frag_baseline << std::endl;
+
+            FontFamily& frag_fm = ffm.getFontFamily(frag_family_id);
+
+            frag_fm.printTextFragment(successors_frag[i], work_buffer, single_chan_buff, buffer_w, buffer_h, changing_xpos, frag_baseline);
+
+            FragmentDescriptor fd_new = FragmentDescriptor(frag_baseline, successors[i].initial_xpos, changing_xpos, frag_family_id);
+
+            frag_map.emplace(fd_new, successors_frag[i]);
+
+        }
+
+    }
+    
+    std::vector<FragmentDescriptor> selectAllFragmentOfLine(int baseline) {
+
+
+        std::map<FragmentDescriptor, FontFamily::HprlTextFragment, FragmentDescriptor>::iterator end = frag_map.end();
+        std::map<FragmentDescriptor, FontFamily::HprlTextFragment, FragmentDescriptor>::iterator begin = frag_map.begin();
+
+        std::vector<FragmentDescriptor> fragmentOfLine;
+
+        for (begin; begin != end && begin->first.baseline <= baseline; begin++) {
+
+            if (begin->first.baseline == baseline) {
+                fragmentOfLine.push_back(begin->first);
+            }
+
+        }
+
+        return fragmentOfLine;
+    }
+
+    std::vector<FragmentDescriptor> findAllSuccessors(FragmentDescriptor& fd) {
+
+        std::map<FragmentDescriptor, FontFamily::HprlTextFragment, FragmentDescriptor>::iterator end = frag_map.end();
+        std::map<FragmentDescriptor, FontFamily::HprlTextFragment, FragmentDescriptor>::iterator current_pos = frag_map.find(fd);
+
+      
+        std::vector<FragmentDescriptor> successors;
+
+        for (++current_pos; current_pos != end; current_pos++) {
+
+            successors.push_back(current_pos->first);
+
+        }
+
+        return successors;
+    }
+
+
+
+    
+
+
+
+    
+
+
+    unsigned char* addNewLine() {
+
+        last_xpos = left_margin_px;
+        FontFamily& current_fm = ffm.getFontFamily(current_id_font_family);
+        last_baseline += (ascent - descent + line_gap) * current_fm.basic_font_faces_map.at("normal").getScaleFactor(char_height);
+        return work_buffer;
+
+    }
+  
     void ManageBold(bool is_active) {
 
         bold = is_active;
@@ -9228,8 +9460,46 @@ public:
 
     }
 
+    void printMap() {
+
+        int baseline = frag_map.begin()->first.baseline;
+
+        for (auto const& [key, val] : frag_map)
+        {
+
+            if (key.baseline != baseline) {
+                baseline = key.baseline;
+                std::cout << "\n*********************" << std::endl;
+            }
+            
+            std::cout 
+                << "Baseline: " << key.baseline
+                << " Ixpos: " << key.initial_xpos
+                << " Expos: " << key.end_xpos
+                << " Content: " << val.content_utf8        // string's value
+                << std::endl;
+
+            
+        }
+
+
+
+    }
+
 private:
 
+
+    struct TextEditorLine {
+
+        bool align_left = false;
+        bool align_right = false;
+        bool align_center = false;
+
+        int line_baseline;
+        int line_advance;
+        std::vector<FragmentDescriptor*> frags;
+
+    };
 
     FontFamilyManager& ffm;
 
@@ -9237,14 +9507,16 @@ private:
 
     std::map<FragmentDescriptor, FontFamily::HprlTextFragment, FragmentDescriptor> frag_map;
 
+    std::vector<TextEditorLine> te_lines;
+ 
     unsigned int buffer_w;
     unsigned int buffer_h;
 
     unsigned char* work_buffer;
     unsigned char* single_chan_buff;
 
-    int xpos;
-    int baseline;
+    int last_xpos;
+    int last_baseline;
 
     int ascent;
     int descent;
@@ -9262,6 +9534,63 @@ private:
     bool bold = false;
     bool underlined = false;
     bool striked = false;
+
+    bool align_left = false;
+    bool align_right = false;
+    bool align_center = false;
+
+
+
+
+    //bool addFragmentToText(FragmentDescriptor& fd, )
+
+    std::vector<FragmentDescriptor> findSuccessorsOneTheSameLine(FragmentDescriptor& fd) {
+
+        std::map<FragmentDescriptor, FontFamily::HprlTextFragment, FragmentDescriptor>::iterator end = frag_map.end();
+        std::map<FragmentDescriptor, FontFamily::HprlTextFragment, FragmentDescriptor>::iterator current_pos = frag_map.find(fd);
+
+        int baseline = fd.baseline;
+        std::vector<FragmentDescriptor> successors;
+
+        for (++current_pos; current_pos != end && current_pos->first.baseline == baseline; current_pos++) {
+
+
+            successors.push_back(current_pos->first);
+
+
+        }
+        
+        return successors;
+    }
+
+    bool internalDeleteFragmentNoLayoutAdjustment(FragmentDescriptor& frag_descr) {
+
+        if (frag_map.contains(frag_descr)) {
+
+            int current_xpos = frag_descr.initial_xpos;
+            int initial_baseline = frag_descr.baseline;
+
+            FontFamily::HprlTextFragment& frag = frag_map.at(frag_descr);
+
+            FontFamily& ff_frag = ffm.getFontFamily(frag_descr.font_family_id);
+
+            ff_frag.deleteTextFragment(frag, work_buffer, single_chan_buff, buffer_w, buffer_h, frag_descr.end_xpos, frag_descr.baseline);
+
+            frag_map.erase(frag_descr);
+
+            return true;
+        }
+
+        else {
+
+            return false;
+
+        }
+
+
+
+
+    }
 
 
 };
@@ -9838,29 +10167,37 @@ void FontFamily::printSingleCharacter(unsigned int c, FontColor &color, FontFace
     for (int j = y0; j < y1; j++) {
         for (int i = x0; i < x1; i++) {
 
+            if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] == 0 || single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] == 1) {
 
-            if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] > 0 && single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] < 255) {
-                //red
-                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = unsigned char(color.r * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
-                //green
-                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = unsigned char(color.g * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
-                //blue
-                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = unsigned char(color.b * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
-                //alpha
-                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)];
             }
-
             else {
 
-                //red
-                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = unsigned char(color.r * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
-                //green
-                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = unsigned char(color.g * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
-                //blue
-                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = unsigned char(color.b * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
-                //alpha
-                work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = unsigned char(color.alpha * 255);
+                if (single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)] == 255) {
 
+                    //red
+                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = unsigned char(color.r * 255);
+                    //green
+                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = unsigned char(color.g * 255);
+                    //blue
+                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = unsigned char(color.b * 255);
+                    //alpha
+                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = unsigned char(color.alpha * 255);
+
+                }
+                else{
+
+                    //red
+                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 0] = unsigned char(color.r * 255);
+                    //green
+                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 1] = unsigned char(color.g * 255);
+                    //blue
+                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 2] = unsigned char(color.b * 255);
+                    //alpha
+                    work_buffer[(baseline + j) * tex_w * 4 + ((int)xpos + i) * 4 + 3] = unsigned char(color.alpha * single_chan_buf[(baseline + j) * tex_w + ((int)xpos + i)]);
+                
+                }
+
+                
             }
 
 
