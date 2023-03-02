@@ -72,37 +72,81 @@ int main() {
 
 
 
-    TextEditor te = TextEditor(fff,id_complex2, 1280, 1490, 80, 200, 0, 300);
+    //TextEditor te = TextEditor(fff,id_complex2, 1280, 1490, 80, 200, 0, 300);
+    //Texture tex_ed;
+
+    //te.ManageColor("#000000");
+    //FragmentDescriptor fd5 = te.appendFragment("La prima riga normale", tex_ed);
+    //te.addNewLine();
+    //te.ManageColor("#ee0000");
+    //te.appendFragment("Il razzo va a:", tex_ed);
+    //te.addNewLine();
+    //FragmentDescriptor fd = te.appendFragment("100 ", tex_ed);
+    //te.appendFragment("km/h", tex_ed);
+    //FragmentDescriptor fd3 = te.appendFragment(" fast", tex_ed);
+    //te.appendFragment("pupula", tex_ed);
+    //auto t1 = Clock::now();
+    //te.ManageColor("#00ee00");
+    //auto t2 = Clock::now();
+    //te.changeFontFamily(id_complex);
+    //te.addNewLine();
+    //te.appendFragment("The altitude is: ", tex_ed);
+    //te.ManageColor("#ee0000");
+    //te.appendFragment("иащ", tex_ed);
+    //te.ManageColor("#00ee00");
+    //te.addNewLine();
+    //te.appendFragment("Oxygen level: ", tex_ed);
+    //te.ManageColor("#ee0000");
+    //FragmentDescriptor fd2 = te.appendFragment("critic", tex_ed);
+    ////FragmentDescriptor fd4 = te.printFragmentAt(788, 684, "Diletta leotta", tex_ed);
+    //te.substituteFragment(fd5, "Olio calido", tex_ed);
+    //te.substituteFragment(fd3, "Seppiolina seppiolona ", tex_ed);
+
+
+    NewTextEditor new_te = NewTextEditor(fff,id_complex2, 1280, 1490, 50, 200, 0, 300);
     Texture tex_ed;
 
-    te.ManageColor("#000000");
-    FragmentDescriptor fd5 = te.appendFragment("La prima riga normale", tex_ed);
-    te.addNewLine();
-    te.ManageColor("#ee0000");
-    te.appendFragment("Il razzo va a:", tex_ed);
-    te.addNewLine();
-    FragmentDescriptor fd = te.appendFragment("100 ", tex_ed);
-    te.appendFragment("km/h", tex_ed);
-    FragmentDescriptor fd3 = te.appendFragment(" fast", tex_ed);
-    te.appendFragment(" pupula", tex_ed);
-    auto t1 = Clock::now();
-    te.ManageColor("#00ee00");
-    auto t2 = Clock::now();
-    te.changeFontFamily(id_complex);
-    te.addNewLine();
-    te.appendFragment("The altitude is: ", tex_ed);
-    te.ManageColor("#ee0000");
-    te.appendFragment("иащ", tex_ed);
-    te.ManageColor("#00ee00");
-    te.addNewLine();
-    te.appendFragment("Oxygen level: ", tex_ed);
-    te.ManageColor("#ee0000");
-    FragmentDescriptor fd2 = te.appendFragment("critic", tex_ed);
-    FragmentDescriptor fd4 = te.printFragmentAt(788, 684, "Diletta leotta", tex_ed);
-    te.substituteFragment(fd5, "Olio bollente", tex_ed);
-    te.substituteFragment(fd3, "Seppiolina seppiolona ", tex_ed);
+    new_te.ManageColor("#e00000");
+    FragmentDescriptor fd1 = new_te.appendFragment("Sapone1", tex_ed);
+    new_te.changeSizePx(90);
+    FragmentDescriptor fd2 = new_te.appendFragment("Sapone2", tex_ed);
+    std::cout << std::endl;
+    new_te.changeSizePx(70);
+    FragmentDescriptor fd3 = new_te.appendFragment("Sapone3", tex_ed);
+
+    new_te.ManageColor("#00ee00");
+    new_te.appendFragment("Sapone4", tex_ed);
+    new_te.changeSizePx(70);
+    new_te.appendFragment("Sapone5", tex_ed);
+    new_te.changeSizePx(160);
+    new_te.appendFragment("Sapone6", tex_ed);
+    new_te.changeSizePx(50);
+    new_te.appendFragment("Sapone7", tex_ed);
+    new_te.changeFontFamily(id_complex);
+    new_te.appendFragment("Sapone8", tex_ed);
+    new_te.appendFragment("Sapone9", tex_ed);
+    new_te.changeSizePx(120);
+    new_te.ManageColor("#e00000");
+    FragmentDescriptor fd = new_te.appendFragment("Sapone10", tex_ed);
+    new_te.ManageColor("#00eeee");
+    new_te.substituteFragment(fd, "Sapone20", tex_ed);
+    new_te.ManageColor("#00ee00");
+    new_te.changeSizePx(80);
+    new_te.appendFragment("Sapon11", tex_ed);
+    new_te.appendFragment("Sapone12", tex_ed);
+
+    
+
+    /*new_te.internalDelete(fd1);
+    new_te.internalDelete(fd2);
+    new_te.internalDelete(fd3);*/
+
+    
+    new_te.printStructure();
 
     //te.printMap();
+
+    //te.printLines();
     
     //int width;
     //int height;
@@ -168,7 +212,7 @@ int main() {
     //ImageWriter::createPng("test_from_editor.png", text_parse);
     //ImageWriter::createPng("test_from_creator_default.png", text_created_default);
     //ImageWriter::createPng("test_from_creator_complex.png", text_created_complex);
-    ImageWriter::createPng("test_from_editor_1.png", tex_ed);
+    ImageWriter::createPng("test_new_editor_dilate.png", tex_ed);
     //ImageWriter::createJpg("test.jpg", tex_ed, 100);
 
 
@@ -179,9 +223,9 @@ int main() {
 
 
 
-    std::cout << "\nDelta time t2-t1: "
-        << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()
-        << " microseconds" << std::endl;\
+    //std::cout << "\nDelta time t2-t1: "
+    //    << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()
+    //    << " microseconds" << std::endl;\
 
 
     return 0;
