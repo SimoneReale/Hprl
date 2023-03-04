@@ -103,37 +103,38 @@ int main() {
     //te.substituteFragment(fd3, "Seppiolina seppiolona ", tex_ed);
 
 
-    NewTextEditor new_te = NewTextEditor(fff,id_complex2, 1280, 1490, 50, 200, 0, 300);
+    NewTextEditor new_te = NewTextEditor(fff,id_complex2, 1280, 1490, 50, 200, 200, 500);
     Texture tex_ed;
 
     new_te.ManageColor("#e00000");
-    FragmentDescriptor fd1 = new_te.appendFragment("Sapone1", tex_ed);
-    new_te.changeSizePx(90);
-    FragmentDescriptor fd2 = new_te.appendFragment("Sapone2", tex_ed);
-    std::cout << std::endl;
-    new_te.changeSizePx(70);
-    FragmentDescriptor fd3 = new_te.appendFragment("Sapone3", tex_ed);
-
+    int fd1 = new_te.appendFragment("Sapone1", tex_ed);
+    int fd2 = new_te.appendFragment("Sapone2", tex_ed);
+    new_te.appendFragment("Sapone3", tex_ed);
     new_te.ManageColor("#00ee00");
     new_te.appendFragment("Sapone4", tex_ed);
-    new_te.changeSizePx(70);
-    new_te.appendFragment("Sapone5", tex_ed);
     new_te.changeSizePx(160);
+    int fd4 = new_te.appendFragment("Sapone5", tex_ed);
+    new_te.changeSizePx(20);
     new_te.appendFragment("Sapone6", tex_ed);
-    new_te.changeSizePx(50);
-    new_te.appendFragment("Sapone7", tex_ed);
-    new_te.changeFontFamily(id_complex);
-    new_te.appendFragment("Sapone8", tex_ed);
-    new_te.appendFragment("Sapone9", tex_ed);
-    new_te.changeSizePx(120);
-    new_te.ManageColor("#e00000");
-    FragmentDescriptor fd = new_te.appendFragment("Sapone10", tex_ed);
-    new_te.ManageColor("#00eeee");
-    new_te.substituteFragment(fd, "Sapone20", tex_ed);
-    new_te.ManageColor("#00ee00");
     new_te.changeSizePx(80);
+    int fd3 = new_te.appendFragment("Sapone7", tex_ed);
+    int fd5 = new_te.appendFragment("Sapone8", tex_ed);
+    new_te.appendFragment("Sapone9", tex_ed);
+    new_te.ManageColor("#e00000");
+    new_te.changeFontFamily(id_default);
+    new_te.changeSizePx(100);
+    new_te.appendFragment("Sapone10", tex_ed);
+    new_te.deleteFragmentLayoutAdjustment(fd3);
+    new_te.ManageColor("#00eeee");
+    //new_te.substituteFragment(fd1, "Sapone20", tex_ed);
+    new_te.ManageColor("#00ee00");
+    //new_te.substituteFragment(fd3, "Sapone21", tex_ed);
+    new_te.changeFontFamily(id_complex);
+    new_te.changeSizePx(60);
     new_te.appendFragment("Sapon11", tex_ed);
+    new_te.changeSizePx(130);
     new_te.appendFragment("Sapone12", tex_ed);
+    
 
     
 
